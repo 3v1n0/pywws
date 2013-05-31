@@ -499,6 +499,17 @@ class ToService(object):
             return True
         return False
 
+    def set_last_update(self, date):
+        self.status.set('last update', self.config_section, date.isoformat(' '))
+
+    def get_last_update(self):
+        last_update = self.params.get_datetime(self.config_section, 'last update')
+        if last_update:
+            self.params.unset(self.config_section, 'last update')
+            self.set_last_update(last_update)
+
+        return self.status.get_datetime('last update', self.config_section)
+
     def Upload(self, catchup):
         """Upload one or more weather data records.
 
@@ -518,12 +529,7 @@ class ToService(object):
         :rtype: bool
         
         """
-        last_update = self.params.get_datetime(self.config_section, 'last update')
-        if last_update:
-            self.params.unset(self.config_section, 'last update')
-            self.status.set('last update', self.config_section, last_update.isoformat(' '))
-
-        last_update = self.status.get_datetime('last update', self.config_section)
+        last_update = self.get_last_update()
 
         if catchup and self.catchup > 0:
             start = datetime.utcnow() - timedelta(days=self.catchup)
@@ -533,8 +539,7 @@ class ToService(object):
             for data in self.data[start:]:
                 if not self.send_data(data, self.server, self.fixed_data):
                     return False
-                self.status.set('last update', self.config_section,
-                                data['idx'].isoformat(' '))
+                self.set_last_update(data['idx'])
                 count += 1
             if count:
                 self.logger.info('%d records sent', count)
@@ -549,8 +554,7 @@ class ToService(object):
             if not self.send_data(
                     self.data[last_update], self.server, self.fixed_data):
                 return False
-            self.status.set(
-                'last update', self.config_section, last_update.isoformat(' '))
+            self.set_last_update(last_update)
         return True
 
     def RapidFire(self, data, catchup):
@@ -582,13 +586,7 @@ class ToService(object):
         
         """
         last_log = self.data.before(datetime.max)
-
-        last_update = self.params.get_datetime(self.config_section, 'last update')
-        if last_update:
-            self.params.unset(self.config_section, 'last update')
-            self.status.set('last update', self.config_section, last_update.isoformat(' '))
-
-        last_update = self.status.get_datetime('last update', self.config_section)
+        last_update = self.get_last_update()
 
         if not last_log or last_log < data['idx'] - FIVE_MINS:
             # logged data is not (yet) up to date
@@ -605,8 +603,7 @@ class ToService(object):
             return False
         if not self.send_data(data, self.server_rf, self.fixed_data_rf):
             return False
-        self.status.set(
-            'last update', self.config_section, data['idx'].isoformat(' '))
+        self.set_last_update(data['idx'])
         return True
 
 def main(argv=None):
