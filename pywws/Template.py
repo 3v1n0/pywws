@@ -59,10 +59,12 @@ HOUR = timedelta(hours=1)
 DAY = timedelta(hours=24)
 
 class Template(object):
-    def __init__(self, params, calib_data, hourly_data, daily_data, monthly_data,
+    def __init__(self, params, status,
+                 calib_data, hourly_data, daily_data, monthly_data,
                  use_locale=True):
         self.logger = logging.getLogger('pywws.Template')
         self.params = params
+        self.status = status
         self.calib_data = calib_data
         self.hourly_data = hourly_data
         self.daily_data = daily_data
@@ -71,7 +73,7 @@ class Template(object):
         self.midnight = None
         self.rain_midnight = None
         # get character encoding of template input & output
-        self.encoding = params.get('config', 'template encoding', 'iso-8859-1')
+        self.encoding = self.get_option('template encoding', 'iso-8859-1')
         self.local_data = {
             'altitude': self.get_option('altitude', cast_type=int),
             'latitude': self.get_option('latitude', cast_type=float),
@@ -79,11 +81,8 @@ class Template(object):
         }
 
     def get_option(self, option, default=None, cast_type=None):
-        if self.params.has_option('config', option):
-            val = self.params.get('config', option, default)
-            return cast_type(val) if cast_type else val
-
-        return None
+        val = self.params.get('config', option, default)
+        return cast_type(val) if cast_type and val else val
 
     def process(self, live_data, template_file):
         def jump(idx, count):
@@ -116,12 +115,13 @@ class Template(object):
         dew_point = WeatherStation.dew_point
         wind_chill = WeatherStation.wind_chill
         apparent_temp = WeatherStation.apparent_temp
+        hour_diff = self._hour_diff
         rain_hour = self._rain_hour
         rain_day = self._rain_day
         rain_24 = self._rain_24
         get_option = self.get_option
-        pressure_offset = eval(self.params.get('fixed', 'pressure offset'))
-        fixed_block = eval(self.params.get('fixed', 'fixed block'))
+        pressure_offset = eval(self.status.get('fixed', 'pressure offset'))
+        fixed_block = eval(self.status.get('fixed', 'fixed block'))
         # start off with no time rounding
         round_time = None
         # start off in hourly data mode
@@ -286,6 +286,10 @@ class Template(object):
         of.close()
         return 0
 
+    def _hour_diff(self, data, key):
+        hour_ago = self.calib_data[self.calib_data.nearest(data['idx'] - HOUR)]
+        return data[key] - hour_ago[key]
+
     def _rain_hour(self, data):
         rain_hour = self.calib_data[self.calib_data.nearest(data['idx'] - HOUR)]['rain']
         return max(0.0, data['rain'] - rain_hour)
@@ -331,9 +335,10 @@ def main(argv=None):
             return 0
     logger = ApplicationLogger(1)
     params = DataStore.params(args[0])
+    status = DataStore.status(args[0])
     Localisation.SetApplicationLanguage(params)
     return Template(
-        params,
+        params, status,
         DataStore.calib_store(args[0]), DataStore.hourly_store(args[0]),
         DataStore.daily_store(args[0]), DataStore.monthly_store(args[0])
         ).make_file(args[1], args[2])
