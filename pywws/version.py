@@ -1,3 +1,5 @@
-version = '13.05'
-release = '1014'
-commit = '484db9c'
+version = '13.11.cwop.dev1112'
+release = '1112'
+commit = '4ce6ac8'
+if __name__ == '__main__':
+    print(version)

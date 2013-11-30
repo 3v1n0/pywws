@@ -38,6 +38,16 @@ import sys, os
 
 sys.path.insert(0, os.path.abspath('..'))
 
+# cludge to allow documentation to be compiled without installing dependencies
+class Dummy(object):
+    def __getattr__(self, name):
+        if name in ('__file__',):
+            return None
+        return Dummy
+
+for mod_name in ('hid', 'oauth2', 'twitter', 'usb', 'usb.core', 'usb.util'):
+    sys.modules[mod_name] = Dummy()
+
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -155,7 +165,7 @@ html_favicon = 'pywws_logo.ico'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = []
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.

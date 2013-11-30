@@ -22,35 +22,8 @@ How to get started with pywws
 Install dependencies
 --------------------
 
-* Python 2.5+ - http://python.org/ (Note: Python 3 support is under development.)
-
-* USB library option 1 (preferred, except on MacOS):
-
-  * PyUSB 1.0 - http://sourceforge.net/apps/trac/pyusb/
-  * libusb 0.1 or 1.0 - http://www.libusb.org/
-* USB library option 2 (if PyUSB 1.0 is not available):
-
-  * PyUSB 0.4 - http://sourceforge.net/apps/trac/pyusb/
-  * libusb 0.1 - http://www.libusb.org/
-* USB library option 3 (best for MacOS):
-
-  * hidapi - https://github.com/signal11/hidapi
-  * ctypes - http://docs.python.org/2/library/ctypes.html
-* USB library option 4:
-
-  * hidapi - https://github.com/signal11/hidapi
-  * cython-hidapi - https://github.com/gbishop/cython-hidapi
-  * cython - http://cython.org/
-
-You may be able to install most of these using your operating system's package manager.
-This is a lot easier than downloading and compiling source files from the project websites.
-Note that some Linux distributions may use different names for some of the packages, e.g. in Ubuntu, pyusb is python-usb.
-
-In addition to the above, I recommend installing `pip <http://www.pip-installer.org/>`_ (the package may be called python-pip) or `easy_install <http://peak.telecommunity.com/DevCenter/EasyInstall>`_.
-These both simplify installation of software from the `Python Package Index (PyPI) <http://pypi.python.org/pypi>`_.
-For example, PyUSB can be installed from PyPI using the ``pip`` command::
-
-   sudo pip install pyusb
+Before you can do anything with pywws you need to install Python and some USB libraries (to allow Python to access the weather station).
+See :doc:`../essentials/dependencies` for more detail.
 
 Download the pywws software
 ---------------------------
@@ -76,6 +49,10 @@ The directories everything gets installed to depend on your operating system and
 The pywws modules are installed in the 'site-packages' directory (e.g. ``/usr/lib/python2.7/site-packages``).
 Typically the scripts are installed in ``/usr/bin``, and the example files are installed in ``/usr/share/pywws``, but other directories (such as ``/usr/local/share``) could be used.
 
+Upgrading pywws is also a one line command::
+
+   sudo pip install pywws -U
+
 Download and extract
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -97,11 +74,14 @@ It is convenient to create a soft link to this awkwardly named directory::
    cd ~/weather
    ln -s pywws-12.11_95babb0 pywws
 
-Alternatively, to get the latest development version of pywws use ``git clone``, then use ``setup.py`` to compile the language files and documentation::
+Alternatively, to get the latest development version of pywws use ``git clone``::
 
    cd ~/weather
    git clone https://github.com/jim-easterbrook/pywws.git
-   cd pywws
+
+After cloning you may want to use ``setup.py`` to compile the language files and documentation, if you have installed the ``gettext`` and ``sphinx`` packages::
+
+   cd ~/weather/pywws
    python setup.py msgfmt
    python setup.py build_sphinx
 
@@ -113,6 +93,15 @@ After downloading and extracting, or cloning the repos, you can then use ``setup
 
 This is optional, and installs into the same directories as using ``pip`` would.
 If you don't do this installation process, you will only be able to run pywws modules from your pywws directory.
+
+Upgrading a cloned repos is done with ``git pull``, after which you can recompile and reinstall if you wish::
+
+   cd ~/weather/pywws
+   git pull
+
+Upgrading a downloaded snapshot is the same process as the first installation.
+Download the .tar.gz or .zip file, extract its contents, then delete the soft link pointing to the old download and create one pointing to the new download.
+Once you are satisfied the new version is working OK you can delete the old download entirely.
 
 (Python 3 users only) Translate pywws to Python 3
 -------------------------------------------------
@@ -161,14 +150,12 @@ If you have any other problem, please ask for help on the pywws mailing list: ht
 Set up your weather station
 ---------------------------
 
-If you haven't already done so, set your weather station to display the correct relative atmospheric pressure.
+If you haven't already done so, you should set your weather station to display the correct relative atmospheric pressure.
 (See the manual for details of how to do this.)
-pywws gets the offset between relative and absolute pressure from the station, so this needs to be set before using pywws.
+pywws gets the offset between relative and absolute pressure from the station, so this should be set before using pywws.
 
 You can get the correct relative pressure from your location by looking on the internet for weather reports from a nearby station, ideally an official one such as an airport.
 This is best done during calm weather when the pressure is almost constant over a large area.
-
-If you change the offset at any time, you can update all your stored data by running :py:mod:`pywws.Reprocess`.
 
 Set the weather station logging interval
 ----------------------------------------
@@ -185,7 +172,7 @@ Log your weather station data
 -----------------------------
 
 First, choose a directory to store all your weather station data.
-This will be written to quite frequently, so a disk drive is preferable to a memory stick, as these have a limited number of writes.
+This will be written to quite frequently, so a disk drive is preferable to a flash memory stick or card, as these have a limited number of writes.
 In most cases your home directory is suitable, for example::
 
    mkdir ~/weather/data
@@ -231,6 +218,7 @@ Open this with a text editor. You should find something like the following::
    [config]
    ws type = 1080
    logdata sync = 1
+   pressure offset = 9.4
 
 You need to add a new entry in the ``[config]`` section called ``day end hour``.
 This tells pywws what convention you want to use when calculating daily summary data.
@@ -244,9 +232,17 @@ After editing, your weather.ini file should look something like this::
    [config]
    ws type = 1080
    logdata sync = 1
+   pressure offset = 9.4
    day end hour = 9
 
+You can also edit the ``pressure offset`` value to adjust how pywws calculates the relative (sea level) air pressure from the absolute value that the station measures.
+If you change the pressure offset or day end hour in future, you must update all your stored data by running :py:mod:`pywws.Reprocess`.
+
 For more detail on the configuration file options, see :doc:`../guides/weather_ini`.
+
+.. versionchanged:: 13.10_r1082
+   made ``pressure offset`` a config item.
+   Previously it was always read from the weather station.
 
 Process the raw data
 --------------------
@@ -271,8 +267,10 @@ You are now ready to set up regular or continuous logging, as described in :doc:
 Read the documentation
 ----------------------
 
-The doc directory in your pywws source directory contains HTML and plain text versions of the documentation (unless you did a direct installation with ``pip``).
+The doc directory in your pywws source directory contains HTML documentation (unless you did a direct installation with ``pip``).
 The HTML files can be read with any web browser.
 Start with the index (:doc:`../index`) and follow links from there.
+
+----
 
 Comments or questions? Please subscribe to the pywws mailing list http://groups.google.com/group/pywws and let us know.

@@ -50,11 +50,10 @@ import time
 
 from pywws import DataStore
 from pywws import Localisation
-from pywws.LogData import Catchup, CheckFixedBlock
+from pywws.LogData import DataLogger
 from pywws.Logger import ApplicationLogger
 from pywws import Process
 from pywws import Tasks
-from pywws import WeatherStation
 
 def LiveLog(data_dir):
     logger = logging.getLogger('pywws.LiveLog')
@@ -62,66 +61,35 @@ def LiveLog(data_dir):
     status = DataStore.status(data_dir)
     # localise application
     Localisation.SetApplicationLanguage(params)
-    # connect to weather station
-    ws_type = params.get('fixed', 'ws type')
-    if ws_type:
-        params.unset('fixed', 'ws type')
-        params.set('config', 'ws type', ws_type)
-    ws_type = params.get('config', 'ws type', '1080')
-    ws = WeatherStation.weather_station(
-        ws_type=ws_type, params=params, status=status)
-    fixed_block = CheckFixedBlock(ws, params, status, logger)
-    if not fixed_block:
-        logger.error("Invalid data from weather station")
-        return 3
     # open data file stores
     raw_data = DataStore.data_store(data_dir)
     calib_data = DataStore.calib_store(data_dir)
     hourly_data = DataStore.hourly_store(data_dir)
     daily_data = DataStore.daily_store(data_dir)
     monthly_data = DataStore.monthly_store(data_dir)
+    # create a DataLogger object
+    datalogger = DataLogger(params, status, raw_data)
     # create a RegularTasks object
-    tasks = Tasks.RegularTasks(
-        params, status, calib_data, hourly_data, daily_data, monthly_data)
-    # get time of last logged data
-    two_minutes = timedelta(minutes=2)
-    last_stored = raw_data.before(datetime.max)
-    if last_stored == None:
-        last_stored = datetime.min
-    if datetime.utcnow() < last_stored:
-        raise ValueError('Computer time is earlier than last stored data')
-    last_stored += two_minutes
+    asynch = eval(params.get('config', 'asynchronous', 'False'))
+    tasks = Tasks.RegularTasks(params, status, raw_data, calib_data,
+                               hourly_data, daily_data, monthly_data,
+                               asynch=asynch)
     # get live data
-    hour = timedelta(hours=1)
-    next_hour = datetime.utcnow().replace(
-                                    minute=0, second=0, microsecond=0) + hour
-    next_ptr = None
-    for data, ptr, logged in ws.live_data(
+    try:
+        for data, logged in datalogger.live_data(
                                     logged_only=(not tasks.has_live_tasks())):
-        now = data['idx']
-        if logged:
-            if ptr == next_ptr:
-                # data is contiguous with last logged value
-                raw_data[now] = data
+            if logged:
+                # process new data
+                Process.Process(params, raw_data, calib_data,
+                                hourly_data, daily_data, monthly_data)
+                # do tasks
+                tasks.do_tasks()
             else:
-                # catch up missing data
-                Catchup(ws, logger, raw_data, now, ptr)
-            next_ptr = ws.inc_ptr(ptr)
-            # process new data
-            Process.Process(params, status, raw_data, calib_data,
-                            hourly_data, daily_data, monthly_data)
-            # do tasks
-            tasks.do_tasks()
-            if now >= next_hour:
-                next_hour += hour
-                fixed_block = CheckFixedBlock(ws, params, status, logger)
-                if not fixed_block:
-                    logger.error("Invalid data from weather station")
-                    return 3
-                # save any unsaved data
-                raw_data.flush()
-        else:
-            tasks.do_live(data)
+                tasks.do_live(data)
+    except Exception, ex:
+        logger.exception(ex)
+    finally:
+        tasks.stop_thread()
     return 0
 
 def main(argv=None):

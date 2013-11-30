@@ -19,6 +19,7 @@ develop-eggs
 # Compiled documentation
 doc/html/*/
 doc/text
+doc_src/api/pywws.*.rst
 
 # Miscellaneous
 MANIFEST

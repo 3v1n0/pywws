@@ -23,6 +23,18 @@
 
 %s
 
+Introduction
+------------
+
+This program recreates the calibrated, hourly, daily and monthly
+summary data that is created by the :py:mod:`pywws.Process` program.
+It should be run whenever you upgrade to a newer version of pywws (if
+the summary data format has changed), change your calibration module
+or alter your pressure offset.
+
+Detailed API
+------------
+
 """
 
 __docformat__ = "restructuredtext en"
@@ -63,8 +75,10 @@ def Reprocess(data_dir):
     daily_data = DataStore.daily_store(data_dir)
     monthly_data = DataStore.monthly_store(data_dir)
     Process.Process(
-        params, raw_data, calib_data, hourly_data, daily_data, monthly_data)
+        params,
+        raw_data, calib_data, hourly_data, daily_data, monthly_data)
     return 0
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -90,5 +104,6 @@ def main(argv=None):
     logger = ApplicationLogger(verbose)
     data_dir = args[0]
     return Reprocess(data_dir)
+
 if __name__ == "__main__":
     sys.exit(main())

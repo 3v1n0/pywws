@@ -56,6 +56,7 @@ check before downloading sources and compiling them yourself.
 
     This should be available as a package for your operating system.
     For example::
+
         sudo apt-get install cython
 
 #.  Install cython-hidapi.
@@ -100,18 +101,18 @@ class USBDevice(object):
     def __init__(self, idVendor, idProduct):
         """Low level USB device access via cython-hidapi library.
 
-        :param idVendor: the USB ``vendor ID` number, for example 0x1941.
+        :param idVendor: the USB "vendor ID" number, for example 0x1941.
 
         :type idVendor: int
 
-        :param idProduct: the USB ``product ID` number, for example 0x8021.
+        :param idProduct: the USB "product ID" number, for example 0x8021.
 
         :type idProduct: int
 
         """
+        if not hid.enumerate(idVendor, idProduct):
+            raise IOError("No weather station connected")
         self.hid = hid.device(idVendor, idProduct)
-        if not self.hid:
-            raise IOError("Weather station device not found")
 
     def read_data(self, size):
         """Receive data from the device.
@@ -133,7 +134,8 @@ class USBDevice(object):
             count = min(size, 8)
             buf = self.hid.read(count)
             if len(buf) < count:
-                raise IOError('pywws.device_cython_hidapi.USBDevice.read_data failed')
+                raise IOError(
+                    'pywws.device_cython_hidapi.USBDevice.read_data failed')
             result += buf
             size -= count
         return result
@@ -150,4 +152,7 @@ class USBDevice(object):
         :rtype: bool
 
         """
-        return self.hid.write(buf)
+        if self.hid.write(buf) != len(buf):
+            raise IOError(
+                'pywws.device_cython_hidapi.USBDevice.write_data failed')
+        return True

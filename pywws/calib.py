@@ -28,6 +28,7 @@ area, you can write a calibration routine to double the rain value.
 The default calibration does two things:
     #. Generate relative atmospheric pressure.
     #. Remove invalid wind direction values.
+
 Any user calibration you write must also do these.
 
 Writing your calibration module
@@ -38,12 +39,14 @@ graph templates, it's best to keep it separate from the pywws code, so
 it isn't affected by pywws upgrades. I suggest creating a ``modules``
 directory in the same place as your ``templates`` directory.
 
-Create a plain text file in your ``modules`` directory, e.g.
+You could start by copying one of the example calibration modules, or
+you can create a plain text file in your ``modules`` directory, e.g.
 ``calib.py`` and copy the following text into it::
 
     class Calib(object):
-        def __init__(self, status):
-            self.pressure_offset = eval(status.get('fixed', 'pressure offset'))
+        def __init__(self, params, stored_data):
+            self.pressure_offset = eval(params.get('config', 'pressure offset'))
+
         def calib(self, raw):
             result = dict(raw)
             # sanitise data
@@ -54,10 +57,11 @@ Create a plain text file in your ``modules`` directory, e.g.
             return result
 
 The :class:`Calib` class has two methods. :py:meth:`Calib.__init__` is
-the constructor and is a good place to set any constants you need.
-:py:meth:`Calib.calib` generates a single set of 'calibrated' data
-from a single set of 'raw' data. There are a few rules to follow when
-writing this method:
+the constructor and is a good place to set any constants you need. It
+is passed a reference to the raw data storage which can be useful for
+advanced tasks such as spike removal. :py:meth:`Calib.calib` generates
+a single set of 'calibrated' data from a single set of 'raw' data.
+There are a few rules to follow when writing this method:
 
     - Make sure you include the line ``result = dict(raw)``, which
       copies all the raw data to your result value, at the start.
@@ -85,7 +89,6 @@ end of the file name.
 
 __docformat__ = "restructuredtext en"
 
-from datetime import datetime, timedelta
 import logging
 import os
 import sys
@@ -94,12 +97,13 @@ class DefaultCalib(object):
     """Default calibration class.
 
     This class sets the relative pressure, using a pressure offset
-    read from the weather station, and 'sanitises' the wind direction
-    value. This is the bare minimum 'calibration' required.
+    originally read from the weather station, and 'sanitises' the wind
+    direction value. This is the bare minimum 'calibration' required.
 
     """
-    def __init__(self, status):
-        self.pressure_offset = eval(status.get('fixed', 'pressure offset'))
+    def __init__(self, params, stored_data):
+        self.pressure_offset = eval(params.get('config', 'pressure offset'))
+
     def calib(self, raw):
         result = dict(raw)
         # sanitise data
@@ -123,7 +127,7 @@ class Calib(object):
 
     """
     calibrator = None
-    def __init__(self, params, status):
+    def __init__(self, params, stored_data):
         global usercalib
         self.logger = logging.getLogger('pywws.Calib')
         if not Calib.calibrator:
@@ -135,8 +139,8 @@ class Calib(object):
                 module = os.path.splitext(module)[0]
                 usercalib = __import__(
                     module, globals(), locals(), ['Calib'])
-                Calib.calibrator = usercalib.Calib(status)
+                Calib.calibrator = usercalib.Calib(params, stored_data)
             else:
                 self.logger.info('Using default calibration')
-                Calib.calibrator = DefaultCalib(status)
+                Calib.calibrator = DefaultCalib(params, stored_data)
         self.calib = Calib.calibrator.calib

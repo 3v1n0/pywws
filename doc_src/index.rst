@@ -31,7 +31,8 @@ pywws
 This document is available in the following languages (non-English versions may not be complete or up to date):
 
    * `English <../../en/html/index.html>`_
-   * `Français <../../fr/html/index.html>`_
+   * `Français <../../fr/html/index.html>`_ -- translated by Jacques Desroches
+   * `Italiano <../../it/html/index.html>`_ -- translated by Edoardo
 
 ************
 Introduction
@@ -47,43 +48,10 @@ I have written this software to meet my needs, but have tried to make it adaptab
 Requirements
 ************
 
-The software you'll need to run pywws depends on what you plan to do with it. In particular, there is a choice of USB library, to suit what's available on different operating systems.
+The software you'll need to run pywws depends on what you plan to do with it.
+You'll need Python 2.5 or later -- Python 3 is partially supported, some functionality depends on libraries that have not yet been ported to Python 3.
 
-   * `Python <http://python.org/>`_ version 2.5 or higher (note: Python 3 support is under development - some things may not work properly)
-   * USB library option 1 (preferred, except on MacOS):
-
-     *  `PyUSB <http://sourceforge.net/apps/trac/pyusb/>`_ version 1.0
-     *  `libusb <http://www.libusb.org/>`_ version 0.1 or version 1.0
-   * USB library option 2 (if PyUSB 1.0 is not available):
-
-     *  `PyUSB <http://sourceforge.net/apps/trac/pyusb/>`_ version 0.4
-     *  `libusb <http://www.libusb.org/>`_ version 0.1
-   * USB library option 3 (best for MacOS):
-
-     *  `hidapi <https://github.com/signal11/hidapi>`_
-     *  `ctypes <http://docs.python.org/2/library/ctypes.html>`_
-   * USB library option 4:
-
-     *  `hidapi <https://github.com/signal11/hidapi>`_
-     *  `cython-hidapi <https://github.com/gbishop/cython-hidapi>`_
-     *  `cython <http://cython.org/>`_
-   * For graph drawing:
-
-     *  `gnuplot <http://www.gnuplot.info/>`_ v4.2 or higher
-   * For secure website uploading (sftp)
-
-     *  `paramiko <http://www.lag.net/paramiko/>`_
-     *  `pycrypto <http://www.dlitz.net/software/pycrypto/>`_
-   * For Twitter updates:
-
-     *  `tweepy <https://github.com/tweepy/tweepy>`_ v2.0 or higher
-     *  `simplejson <http://pypi.python.org/pypi/simplejson>`_
-   * To create new language translations:
-
-     *  `gettext <http://www.gnu.org/s/gettext/>`_
-   * To 'compile' the documentation:
-
-     *  `sphinx <http://sphinx-doc.org/>`_
+For more detail, see :doc:`essentials/dependencies`.
 
 ***********************
 Getting a copy of pywws
@@ -94,7 +62,7 @@ Note that this will probably require 'root' privileges, so will need to be run u
 
    sudo pip install pywws
 
-If you don't have root privileges, or don't want to install pywws, you can download a zip or tar.gz file from PyPI and then extract the files into a convenient directory on your computer.
+If you don't have root privileges, or don't want to install pywws into the system directories, you can download a zip or tar.gz file from PyPI and then extract the files into any convenient directory on your computer.
 
 The PyPI files contain a snapshot release of the software - a new one is issued every few months.
 If you'd like to keep up to date with latest developments of pywws, you should use ``git`` to clone the pywws repository::
@@ -104,15 +72,21 @@ If you'd like to keep up to date with latest developments of pywws, you should u
 After doing so you can compile the documentation and language localisation files (which will require the ``sphinx`` and ``gettext`` dependencies)::
 
    cd pywws
-   python setup.py build_sphinx
    python setup.py msgfmt
+   python setup.py build_sphinx
+
+This is optional -- the documentation is available online and you might prefer to use pywws in English.
 
 For more details, see :doc:`guides/getstarted`.
 
 Upgrading pywws
 ===============
 
-The method used to upgrade pywws depends on how you originally obtained it. If you downloaded a zip or tar.gz file, you just need to do the same again, with the new version, then delete your old download when you've finished setting up the new one. (Note that upgrading is much easier if you do not keep your templates, user modules and weather data in the same directory as the downloaded files.) If you used ``pip`` you just need to repeat the command. ``git`` users just need to do a ``git pull`` command.
+The method used to upgrade pywws depends on how you originally obtained it. If you downloaded a zip or tar.gz file, you just need to do the same again, with the new version, then delete your old download when you've finished setting up the new one. (Note that upgrading is much easier if you do not keep your templates, user modules and weather data in the same directory as the downloaded files.)
+``git`` users just need to do a ``git pull`` command.
+If you used ``pip`` you need to use the upgrade option::
+
+   sudo pip install pywws -U
 
 Some new versions of pywws have changed what's stored in the hourly, daily or monthly summary data files. These new versions are incompatible with processed data from earlier versions. The :py:mod:`pywws.Reprocess` module regenerates all the summary data. It should be run after any major upgrade.
 
@@ -131,9 +105,10 @@ Contents
    :maxdepth: 2
 
    Licence <essentials/LICENCE>
+   Dependencies <essentials/dependencies>
    Change log <essentials/CHANGELOG>
    User guides <guides/index>
-   Python modules <api/index>
+   Python modules <api_index>
 
 Indices and tables
 ==================

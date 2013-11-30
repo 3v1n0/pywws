@@ -16,17 +16,43 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-pywws.LogData
-=============
+Python programs and modules
+===========================
 
-.. automodule:: pywws.LogData
+Contents:
 
-   .. rubric:: Functions
+.. autosummary::
+   :toctree: api
 
-   .. autosummary::
-   
-      Catchup
-      CheckFixedBlock
-      LogData
-      main
-   
+   pywws.Hourly
+   pywws.LiveLog
+   pywws.Reprocess
+   pywws.TwitterAuth
+   pywws.SetWeatherStation
+   pywws.TestWeatherStation
+   pywws.USBQualityTest
+   pywws.EWtoPy
+   pywws.Tasks
+   pywws.LogData
+   pywws.Process
+   pywws.calib
+   pywws.Plot
+   pywws.WindRose
+   pywws.Template
+   pywws.Forecast
+   pywws.ZambrettiCore
+   pywws.Upload
+   pywws.ToTwitter
+   pywws.toservice
+   pywws.YoWindow
+   pywws.WeatherStation
+   pywws.device_ctypes_hidapi
+   pywws.device_cython_hidapi
+   pywws.device_pyusb1
+   pywws.device_pyusb
+   pywws.DataStore
+   pywws.TimeZone
+   pywws.Localisation
+   pywws.calib
+   pywws.conversions
+   pywws.Logger

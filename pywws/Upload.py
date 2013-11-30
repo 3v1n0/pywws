@@ -23,6 +23,43 @@
 
 %s
 
+Introduction
+------------
+
+This module uploads files to (typically) a website *via* ftp/sftp or
+copies files to a local directory (e.g. if you are running pywws on
+the your web server). Details of the upload destination are stored in
+the file ``weather.ini`` in your data directory. The only way to set
+these details is to edit the file. Run :py:mod:`pywws.Upload` once to
+set the default values, which you can then change. Here is what you're
+likely to find when you edit ``weather.ini``::
+
+  [ftp]
+  secure = False
+  directory = public_html/weather/data/
+  local site = False
+  password = secret
+  site = ftp.username.your_isp.co.uk
+  user = username
+
+These are, I hope, fairly obvious. The ``local site`` option lets you
+switch from uploading to a remote site to copying to a local site. If
+you set ``local site = True`` then you can delete the ``secure``,
+``site``, ``user`` and ``password`` lines.
+
+``directory`` is the name of a directory in which all the uploaded
+files will be put. This will depend on the structure of your web site
+and the sort of host you use. Your hosting provider should be able to
+tell you what ``site`` and ``user`` details to use. You should have
+already chosen a ``password``.
+
+The ``secure`` option lets you switch from normal ftp to sftp (ftp
+over ssh). Some hosting providers offer this as a more secure upload
+mechanism, so you should probably use it if available.
+
+Detailed API
+------------
+
 """
 
 __docformat__ = "restructuredtext en"
@@ -45,77 +82,136 @@ import os
 import shutil
 import sys
 
-from . import DataStore
-from .Logger import ApplicationLogger
+from pywws import DataStore
+from pywws.Logger import ApplicationLogger
 
-def Upload(params, files):
-    logger = logging.getLogger('pywws.Upload')
-    if eval(params.get('ftp', 'local site', 'False')):
-        logger.info("Copying to local directory")
-        # copy to local directory
-        directory = params.get(
-            'ftp', 'directory', os.path.expanduser('~/public_html/weather/data/'))
-        if not os.path.isdir(directory):
-            os.makedirs(directory)
-        for file in files:
-            shutil.copy2(file, directory)
-        return True
-    logger.info("Uploading to web site")
-    # get remote site details
-    secure = eval(params.get('ftp', 'secure', 'False'))
-    site = params.get('ftp', 'site', 'ftp.username.your_isp.co.uk')
-    user = params.get('ftp', 'user', 'username')
-    password = params.get('ftp', 'password', 'secret')
-    directory = params.get('ftp', 'directory', 'public_html/weather/data/')
-    # open connection
-    if secure:
-        import paramiko
-        try:
-            transport = paramiko.Transport((site, 22))
-            transport.connect(username=user, password=password)
-            ftp = paramiko.SFTPClient.from_transport(transport)
-            ftp.chdir(directory)
-        except Exception, ex:
-            logger.error(str(ex))
-            return False
-    else:
+class _ftp(object):
+    def __init__(self, logger, site, user, password, directory):
+        global ftplib
         import ftplib
+        self.logger = logger
+        self.site = site
+        self.user = user
+        self.password = password
+        self.directory = directory
+
+    def connect(self):
+        self.logger.info("Uploading to web site with FTP")
+        self.ftp = ftplib.FTP(self.site, self.user, self.password)
+        self.logger.debug(self.ftp.getwelcome())
+        self.ftp.cwd(self.directory)
+
+    def put(self, src, dest):
+        text_file = os.path.splitext(src)[1] in ('.txt', '.xml', '.html')
+        if text_file and sys.version_info[0] < 3:
+            f = open(src, 'r')
+        else:
+            f = open(src, 'rb')
+        if text_file:
+            self.ftp.storlines('STOR %s' % (dest), f)
+        else:
+            self.ftp.storbinary('STOR %s' % (dest), f)
+        f.close()
+
+    def close(self):
+        self.ftp.close()
+
+class _sftp(object):
+    def __init__(self, logger, site, user, password, directory):
+        global paramiko
+        import paramiko
+        self.logger = logger
+        self.site = site
+        self.user = user
+        self.password = password
+        self.directory = directory
+
+    def connect(self):
+        self.logger.info("Uploading to web site with SFTP")
+        self.transport = paramiko.Transport((self.site, 22))
+        self.transport.connect(username=self.user, password=self.password)
+        self.ftp = paramiko.SFTPClient.from_transport(self.transport)
+        self.ftp.chdir(self.directory)
+
+    def put(self, src, dest):
+        self.ftp.put(src, dest)
+
+    def close(self):
+        self.ftp.close()
+        self.transport.close()
+
+class _copy(object):
+    def __init__(self, logger, directory):
+        self.logger = logger
+        self.directory = directory
+
+    def connect(self):
+        self.logger.info("Copying to local directory")
+        if not os.path.isdir(self.directory):
+            os.makedirs(self.directory)
+
+    def put(self, src, dest):
+        shutil.copy2(src, os.path.join(self.directory, dest))
+
+    def close(self):
+        pass
+
+class Upload(object):
+    def __init__(self, params):
+        self.logger = logging.getLogger('pywws.Upload')
+        self.params = params
+        if eval(self.params.get('ftp', 'local site', 'False')):
+            # copy to local directory
+            directory = self.params.get(
+                'ftp', 'directory',
+                os.path.expanduser('~/public_html/weather/data/'))
+            self.uploader = _copy(self.logger, directory)
+        else:
+            # get remote site details
+            site = self.params.get('ftp', 'site', 'ftp.username.your_isp.co.uk')
+            user = self.params.get('ftp', 'user', 'username')
+            password = self.params.get('ftp', 'password', 'secret')
+            directory = self.params.get(
+                'ftp', 'directory', 'public_html/weather/data/')
+            if eval(self.params.get('ftp', 'secure', 'False')):
+                self.uploader = _sftp(
+                    self.logger, site, user, password, directory)
+            else:
+                self.uploader = _ftp(
+                    self.logger, site, user, password, directory)
+
+    def connect(self):
         try:
-            ftp = ftplib.FTP(site, user, password)
-            logger.debug(ftp.getwelcome())
-            ftp.cwd(directory)
+            self.uploader.connect()
         except Exception, ex:
-            logger.error(str(ex))
+            self.logger.error(str(ex))
             return False
-    OK = True
-    for file in files:
+        return True
+
+    def upload_file(self, file):
         target = os.path.basename(file)
-        text_file = os.path.splitext(file)[1] in ('.txt', '.xml', '.html')
         # have three tries before giving up
         for n in range(3):
             try:
-                if secure:
-                    ftp.put(file, target)
-                else:
-                    if text_file and sys.version_info[0] < 3:
-                        f = open(file, 'r')
-                    else:
-                        f = open(file, 'rb')
-                    if text_file:
-                        ftp.storlines('STOR %s' % (target), f)
-                    else:
-                        ftp.storbinary('STOR %s' % (target), f)
-                    f.close()
-                break
+                self.uploader.put(file, target)
+                return True
             except Exception, ex:
-                logger.error(str(ex))
-        else:
-            OK = False
-            break
-    ftp.close()
-    if secure:
-        transport.close()
-    return OK
+                self.logger.error(str(ex))
+        return False
+
+    def disconnect(self):
+        self.uploader.close()
+
+    def upload(self, files):
+        if not self.connect():
+            return False
+        OK = True
+        for file in files:
+            if not self.upload_file(file):
+                OK = False
+                break
+        self.disconnect()
+        return OK
 
 def main(argv=None):
     if argv is None:
@@ -137,7 +233,7 @@ def main(argv=None):
         print >>sys.stderr, __usage__.strip()
         return 2
     logger = ApplicationLogger(1)
-    if Upload(DataStore.params(args[0]), args[1:]):
+    if Upload(DataStore.params(args[0])).upload(args[1:]):
         return 0
     return 3
 

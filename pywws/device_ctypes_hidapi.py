@@ -56,6 +56,7 @@ check before downloading sources and compiling them yourself.
 
     This should be available as a package for your operating system.
     For example::
+
         sudo zypper install python-ctypes
 
 Testing
@@ -86,25 +87,36 @@ import ctypes
 from ctypes.util import find_library
 import sys
 
-# open hidapi shared library
-path = find_library('hidapi')
-if not path:
-    path = find_library('hidapi-libusb')
-if not path:
-    path = find_library('hidapi-hidraw')
-if not path:
-    raise ImportError('Cannot find hidapi library')
-hidapi = ctypes.CDLL(path)
+if 'sphinx' in sys.modules:
+    # building documentation, don't need to import hidapi
+    pass
+else:
+    # open hidapi shared library
+    path = find_library('hidapi')
+    if not path:
+        path = find_library('hidapi-libusb')
+    if not path:
+        path = find_library('hidapi-hidraw')
+    if not path:
+        raise ImportError('Cannot find hidapi library')
+    hidapi = ctypes.CDLL(path)
+    hidapi.hid_open.argtypes = [
+        ctypes.c_ushort, ctypes.c_ushort, ctypes.c_wchar_p]
+    hidapi.hid_open.restype = ctypes.c_void_p
+    hidapi.hid_read_timeout.argtypes = [
+        ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+    hidapi.hid_write.argtypes = [
+        ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
 
 class USBDevice(object):
     def __init__(self, vendor_id, product_id):
         """Low level USB device access via hidapi library.
 
-        :param idVendor: the USB ``vendor ID` number, for example 0x1941.
+        :param idVendor: the USB "vendor ID" number, for example 0x1941.
 
         :type idVendor: int
 
-        :param idProduct: the USB ``product ID` number, for example 0x8021.
+        :param idProduct: the USB "product ID" number, for example 0x8021.
 
         :type idProduct: int
 
@@ -141,9 +153,9 @@ class USBDevice(object):
             if n <= 0:
                 raise IOError(
                     'pywws.device_ctypes_hidapi.USBDevice.read_data failed')
-            for i in range(length):
+            for i in range(n):
                 result.append(ord(data[i]))
-            size -= length
+            size -= n
         return result
 
     def write_data(self, buf):
@@ -159,4 +171,8 @@ class USBDevice(object):
 
         """
         data = ''.join(map(chr, buf))
-        return hidapi.hid_write(self.device, ctypes.c_char_p(data), len(data))
+        size = len(data)
+        if hidapi.hid_write(self.device, ctypes.c_char_p(data), size) != size:
+            raise IOError(
+                'pywws.device_ctypes_hidapi.USBDevice.write_data failed')
+        return True

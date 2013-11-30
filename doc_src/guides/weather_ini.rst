@@ -56,11 +56,15 @@ config: miscellaneous system configuration
  latitude = 51.506419
  longitude = -0.099843
  day end hour = 21
+ pressure offset = 9.4
  gnuplot encoding = iso_8859_1
  template encoding = iso-8859-1
  language = en
  logdata sync = 1
  rain day threshold = 0.2
+ asynchronous = False
+ usb activity margin = 3.0
+ gnuplot version = 4.2
 
 ``ws type`` is the "class" of weather station. It should be set to ``1080`` for most weather stations, or ``3080`` if your station console displays solar illuminance.
 
@@ -71,6 +75,15 @@ config: miscellaneous system configuration
 ``longitude`` of weather station in decimal format.
 
 ``day end hour`` is the end of the "`meteorological day <http://en.wikipedia.org/wiki/Meteorological_day>`_", in local time without daylight savings time. Typical values are 21, 9, or 24.
+You must update all your stored data by running :py:mod:`pywws.Reprocess` after you change this value.
+
+``pressure offset`` is the difference between absolute and relative (sea level) air pressure.
+The initial value is copied from the weather station, assuming you have set it up to display the correct relative pressure, but you can adjust the value in weather.ini to calibrate your station.
+You must update all your stored data by running :py:mod:`pywws.Reprocess` after you change this value.
+
+.. versionchanged:: 13.10_r1082
+   made ``pressure offset`` a config item.
+   Previously it was always read from the weather station.
 
 ``gnuplot encoding`` is the text encoding used when plotting graphs. The default value of ``iso_8859_1`` allows the degree symbol, which is useful in a weather application! Other values might be needed if your language includes accented characters. The possible values depend on your gnuplot installation so some experimentation may be needed.
 
@@ -83,6 +96,19 @@ If you create templates with a different character set, you should change this v
 ``logdata sync`` sets the quality of synchronisation used by :doc:`../api/pywws.LogData`. Set it to 0 for fast & inaccurate or 1 for slower but precise.
 
 ``rain day threshold`` is the amount of rain (in mm) that has to fall in one day for it to qualify as a rainy day in the monthly summary data.
+You must update all your stored data by running :py:mod:`pywws.Reprocess` after you change this value.
+
+.. versionadded:: 13.09_r1057
+   ``asynchrouous`` controls the use of a separate upload thread in :py:mod:`pywws.LiveLog`.
+
+.. versionadded:: 13.10_r1094
+   ``usb activity margin`` controls the algorithm that avoids the "USB lockup" problem that affects some stations.
+   It sets the number of seconds either side of expected station activity (receiving a reading from outside or logging a reading) that pywws does not get data from the station.
+   If your station is not affected by the USB lockup problem you can set ``usb activity margin`` to 0.0.
+
+.. versionadded:: 13.11_r1102
+   ``gnuplot version`` tells :py:mod:`pywws.Plot` and :py:mod:`pywws.WindRose` what version of gnuplot is installed on your computer.
+   This allows them to use version-specific features to give improved plot quality.
 
 paths: directories in which templates etc. are stored
 -----------------------------------------------------
@@ -91,31 +117,31 @@ paths: directories in which templates etc. are stored
  [paths]
  templates = /home/$USER/weather/templates/
  graph_templates = /home/$USER/weather/graph_templates/
- user_calib = /home/jim/weather/modules/usercalib
+ user_calib = /home/$USER/weather/modules/usercalib
  work = /tmp/weather
+ local_files = /home/$USER/weather/results/
 
-These three entries specify where your text templates and graph templates are stored, where temporary files should be created, and (if you have one) the location of your calibration module.
+These entries specify where your text templates and graph templates are stored, where temporary files should be created, where template output (that is not uploaded) should be put, and (if you have one) the location of your calibration module.
 
 live: tasks to be done every 48 seconds
 ---------------------------------------
 ::
 
  [live]
- services = ['underground']
- twitter = []
- text = []
+ services = ['underground_rf']
+ text = [('yowindow.xml', 'L')]
  plot = []
- yowindow = /home/jim/data/yowindow.xml
 
 This section specifies tasks that are to be carried out for every data sample during 'live logging', i.e. every 48 seconds. It is unlikely that you'd want to do anything other than upload to Weather Underground or update your YoWindow file this often.
 
 ``services`` is a list of 'services' to upload data to. Each one listed must have a configuration file in ``pywws/services/``. See :doc:`../api/pywws.toservice` for more detail.
 
-``twitter`` is a list of text templates to be processed and posted to Twitter.
+``text`` and ``plot`` are lists of text and plot templates to be processed and, optionally, uploaded to your website.
 
-``text`` and ``plot`` are lists of text and plot templates to be processed and uploaded to your website.
-
-``yowindow`` is the full path of an xml file to be generated for a YoWindow weather widget (see http://yowindow.com/). If you don't use YoWindow, leave this entry out.
+.. versionchanged:: 13.05_r1013
+   added a ``'yowindow.xml'`` template.
+   Previously yowindow files were generated by a separate module, invoked by a ``yowindow`` entry in the ``[live]`` section.
+   This older syntax still works, but is deprecated.
 
 logged: tasks to be done every time the station logs a data record
 ------------------------------------------------------------------
@@ -123,7 +149,6 @@ logged: tasks to be done every time the station logs a data record
 
  [logged]
  services = ['underground', 'metoffice']
- twitter = ['tweet.txt']
  text = []
  plot = []
 
@@ -131,9 +156,7 @@ This section specifies tasks that are to be carried out every time a data record
 
 ``services`` is a list of 'services' to upload data to. Each one listed must have a configuration file in ``pywws/services/``. See :doc:`../api/pywws.toservice` for more detail.
 
-``twitter`` is a list of text templates to be processed and posted to Twitter.
-
-``text`` and ``plot`` are lists of text and plot templates to be processed and uploaded to your website.
+``text`` and ``plot`` are lists of text and plot templates to be processed and, optionally, uploaded to your website.
 
 hourly: tasks to be done every hour
 -----------------------------------
@@ -141,17 +164,19 @@ hourly: tasks to be done every hour
 
  [hourly]
  services = []
- twitter = ['tweet.txt']
- text = ['24hrs.txt', '6hrs.txt', '7days.txt', 'feed_hourly.xml', 'allmonths.txt']
+ text = [('tweet.txt', 'T'), '24hrs.txt', '6hrs.txt', '7days.txt', 'feed_hourly.xml']
  plot = ['7days.png.xml', '24hrs.png.xml', 'rose_12hrs.png.xml']
 
 This section specifies tasks that are to be carried out every hour when 'live logging' or running an hourly cron job.
 
 ``services`` is a list of 'services' to upload data to. Each one listed must have a configuration file in ``pywws/services/``. See :doc:`../api/pywws.toservice` for more detail.
 
-``twitter`` is a list of text templates to be processed and posted to Twitter.
+``text`` and ``plot`` are lists of text and plot templates to be processed and, optionally, uploaded to your website.
 
-``text`` and ``plot`` are lists of text and plot templates to be processed and uploaded to your website.
+.. versionchanged:: 13.06_r1015
+   added the ``'T'`` flag.
+   Previously Twitter templates were listed separately in ``twitter`` entries in the ``[hourly]`` and other sections.
+   The older syntax still works, but is deprecated.
 
 12 hourly: tasks to be done every 12 hours
 ------------------------------------------
@@ -159,7 +184,6 @@ This section specifies tasks that are to be carried out every hour when 'live lo
 
  [12 hourly]
  services = []
- twitter = []
  text = []
  plot = []
 
@@ -167,9 +191,7 @@ This section specifies tasks that are to be carried out every 12 hours when 'liv
 
 ``services`` is a list of 'services' to upload data to. Each one listed must have a configuration file in ``pywws/services/``. See :doc:`../api/pywws.toservice` for more detail.
 
-``twitter`` is a list of text templates to be processed and posted to Twitter.
-
-``text`` and ``plot`` are lists of text and plot templates to be processed and uploaded to your website.
+``text`` and ``plot`` are lists of text and plot templates to be processed and, optionally, uploaded to your website.
 
 daily: tasks to be done every 24 hours
 --------------------------------------
@@ -177,7 +199,6 @@ daily: tasks to be done every 24 hours
 
  [daily]
  services = []
- twitter = []
  text = ['feed_daily.xml']
  plot = ['2008.png.xml', '2009.png.xml', '2010.png.xml', '28days.png.xml']
 
@@ -185,9 +206,7 @@ This section specifies tasks that are to be carried out every day when 'live log
 
 ``services`` is a list of 'services' to upload data to. Each one listed must have a configuration file in ``pywws/services/``. See :doc:`../api/pywws.toservice` for more detail.
 
-``twitter`` is a list of text templates to be processed and posted to Twitter.
-
-``text`` and ``plot`` are lists of text and plot templates to be processed and uploaded to your website.
+``text`` and ``plot`` are lists of text and plot templates to be processed and, optionally, uploaded to your website.
 
 ftp: configuration of uploading to a website
 --------------------------------------------
@@ -211,7 +230,7 @@ These entries provide details of your website (or local directory) where process
 
 ``user`` and ``password`` are the FTP site login details. Your web site provider should have provided them to you.
 
-``directory`` specifies where on the FTP site (or local file system) the files should be stored. Note that you may have to experiment with this a bit - you might need a '/' character at the start of the address.
+``directory`` specifies where on the FTP site (or local file system) the files should be stored. Note that you may have to experiment with this a bit - you might need a '/' character at the start of the path.
 
 twitter: configuration of posting to Twitter
 --------------------------------------------
@@ -223,7 +242,7 @@ twitter: configuration of posting to Twitter
  latitude = 51.365
  longitude = -0.251
 
-``secret`` and ``key`` are authentication data provided by Twitter. To set them, run the ``TwitterAuth.py`` program.
+``secret`` and ``key`` are authentication data provided by Twitter. To set them, run :py:mod:`pywws.TwitterAuth`.
 
 ``latitude`` and ``longitude`` are optional location data. If you include them then your weather station tweets will have location information so users can see where your weather station is. It might also enable people to find your weather station tweets if they search by location.
 
@@ -256,11 +275,7 @@ fixed: values copied from the weather station's "fixed block"
 ::
 
  [fixed]
- pressure offset = 7.4
  fixed block = {...}
-
-``pressure offset`` is the difference between absolute and relative air pressure.
-It is copied from the weather station, assuming you have set it up to display the correct relative pressure.
 
 ``fixed block`` is all the data stored in the first 256 bytes of the station's memory.
 This includes maximum and minimum values, alarm threshold settings, display units and so on.
@@ -292,3 +307,7 @@ last update: date and time of most recent task completions
 
 These record date & time of the last successful completion of various tasks.
 They are used to allow unsuccessful tasks (e.g. network failure preventing uploads) to be retried after a few minutes.
+
+----
+
+Comments or questions? Please subscribe to the pywws mailing list http://groups.google.com/group/pywws and let us know.

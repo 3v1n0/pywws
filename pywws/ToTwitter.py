@@ -46,14 +46,18 @@ import codecs
 import getopt
 import logging
 import sys
-import tweepy
 
+twitter = None
+tweepy = None
+try:
+    import twitter
+except ImportError:
+    import tweepy
+
+from pywws.constants import Twitter as pct
 from pywws import DataStore
 from pywws import Localisation
 from pywws.Logger import ApplicationLogger
-
-consumer_key = '62moSmU9ERTs0LK0g2xHAg'
-consumer_secret = 'ygdXpjr0rDagU3dqULPqXF8GFgUOD6zYDapoHAH9ck'
 
 class ToTwitter(object):
     def __init__(self, params):
@@ -67,29 +71,38 @@ class ToTwitter(object):
         if (not key) or (not secret):
             raise RuntimeError('Authentication data not found')
 
-        self.lat = params.get('config', 'latitude')
-        self.long = params.get('config', 'longitude')
+        latitude = params.get('config', 'latitude')
+        longitude = params.get('config', 'longitude')
 
-        # added for backward compatibility
-        if not self.lat:
-            self.lat = params.get('twitter', 'latitude')
+        # added for backward compatibility and overriding
+        if not latitude:
+            latitude = params.get('twitter', 'latitude')
         if not self.long:
-            self.long = params.get('twitter', 'longitude')
+            longitude = params.get('twitter', 'longitude')
 
         # open API
-        auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-        auth.set_access_token(key, secret)
-        self.api = tweepy.API(auth)
+        if twitter:
+            self.api = twitter.Api(
+                consumer_key=pct.consumer_key,
+                consumer_secret=pct.consumer_secret,
+                access_token_key=key, access_token_secret=secret)
+            self.post = self.api.PostUpdate
+            self.post_kw = {'latitude' : latitude, 'longitude' : longitude}
+        else:
+            auth = tweepy.OAuthHandler(pct.consumer_key, pct.consumer_secret)
+            auth.set_access_token(key, secret)
+            self.api = tweepy.API(auth)
+            self.post = self.api.update_status
+            self.post_kw = {'lat' : latitude, 'long' : longitude}
 
     def Upload(self, tweet):
         if not tweet:
-            return 0
+            return True
         if not isinstance(tweet, unicode):
             tweet = tweet.decode(self.encoding)
         for i in range(3):
             try:
-                status = self.api.update_status(
-                    tweet, lat=self.lat, long=self.long)
+                status = self.post(tweet, **self.post_kw)
                 return True
             except Exception, ex:
                 e = str(ex)

@@ -78,86 +78,28 @@ __docformat__ = "restructuredtext en"
 
 from datetime import datetime
 import logging
-import math
 import sys
 import time
 
-from . import Localisation
-# import USBDevice later, when we know which USB library to use
+from pywws import Localisation
 USBDevice = None
-
-def dew_point(temp, hum):
-    """Compute dew point, using formula from
-    http://en.wikipedia.org/wiki/Dew_point.
-
-    """
-    if temp is None or hum is None:
-        return None
-    a = 17.27
-    b = 237.7
-    gamma = ((a * temp) / (b + temp)) + math.log(float(hum) / 100.0)
-    return (b * gamma) / (a - gamma)
-
-def wind_chill(temp, wind):
-    """Compute wind chill, using formula from
-    http://en.wikipedia.org/wiki/wind_chill
-
-    """
-    if temp is None or wind is None:
-        return None
-    wind_kph = wind * 3.6
-    if wind_kph <= 4.8 or temp > 10.0:
-        return temp
-    return min(13.12 + (temp * 0.6215) +
-               (((0.3965 * temp) - 11.37) * (wind_kph ** 0.16)),
-               temp)
-
-def apparent_temp(temp, rh, wind):
-    """Compute apparent temperature (real feel), using formula from
-    http://www.bom.gov.au/info/thermal_stress/
-
-    """
-    if temp is None or rh is None or wind is None:
-        return None
-    vap_press = (float(rh) / 100.0) * 6.105 * math.exp(
-        17.27 * temp / (237.7 + temp))
-    return temp + (0.33 * vap_press) - (0.70 * wind) - 4.00
-
-def get_wind_dir_text():
-    """Return an array to convert wind direction integer to a string.
-
-    """
-    _ = Localisation.translation.gettext
-    return [
-        _('N'), _('NNE'), _('NE'), _('ENE'),
-        _('E'), _('ESE'), _('SE'), _('SSE'),
-        _('S'), _('SSW'), _('SW'), _('WSW'),
-        _('W'), _('WNW'), _('NW'), _('NNW'),
-        ]
-
-def pressure_trend_text(trend):
-    """Convert pressure trend to a string, as used by the UK met
-    office.
-
-    """
-    _ = Localisation.translation.gettext
-    if trend > 6.0:
-        return _('rising very rapidly')
-    elif trend > 3.5:
-        return _('rising quickly')
-    elif trend > 1.5:
-        return _('rising')
-    elif trend >= 0.1:
-        return _('rising slowly')
-    elif trend < -6.0:
-        return _('falling very rapidly')
-    elif trend < -3.5:
-        return _('falling quickly')
-    elif trend < -1.5:
-        return _('falling')
-    elif trend <= -0.1:
-        return _('falling slowly')
-    return _('steady')
+if not USBDevice:
+    try:
+        from pywws.device_ctypes_hidapi import USBDevice
+    except ImportError:
+        pass
+if not USBDevice:
+    try:
+        from pywws.device_cython_hidapi import USBDevice
+    except ImportError:
+        pass
+if not USBDevice:
+    try:
+        from pywws.device_pyusb1 import USBDevice
+    except ImportError:
+        pass
+if not USBDevice:
+    from pywws.device_pyusb import USBDevice
 
 # get meaning for status integer
 rain_overflow   = 0x80
@@ -294,25 +236,7 @@ class CUSBDrive(object):
     WriteCommandWord = 0xA2
 
     def __init__(self):
-        global USBDevice
         self.logger = logging.getLogger('pywws.WeatherStation.CUSBDrive')
-        if not USBDevice:
-            try:
-                from .device_ctypes_hidapi import USBDevice
-            except ImportError:
-                pass
-        if not USBDevice:
-            try:
-                from .device_cython_hidapi import USBDevice
-            except ImportError:
-                pass
-        if not USBDevice:
-            try:
-                from .device_pyusb1 import USBDevice
-            except ImportError:
-                pass
-        if not USBDevice:
-            from .device_pyusb import USBDevice
         self.logger.info('using %s', USBDevice.__module__)
         self.dev = USBDevice(0x1941, 0x8021)
 
@@ -382,26 +306,25 @@ class CUSBDrive(object):
 
 class weather_station(object):
     """Class that represents the weather station to user program."""
-    # avoid USB activity this number of seconds each side of time when
-    # station screen is believed to be writing to the memory
-    avoid = 3.0
     # minimum interval between polling for data change
     min_pause = 0.5
-    def __init__(self, ws_type='1080', params=None, status=None):
+    # margin of error for various decisions
+    margin = (min_pause * 2.0) - 0.1
+    def __init__(self, ws_type='1080', params=None, status=None, avoid=3.0):
         """Connect to weather station and prepare to read data."""
         self.logger = logging.getLogger('pywws.weather_station')
         # create basic IO object
         self.cusb = CUSBDrive()
         # init variables
-        self.params = params
         self.status = status
+        self.avoid = max(avoid, 0.0)
         self._fixed_block = None
         self._data_block = None
         self._data_pos = None
         self._current_ptr = None
-        if self.params:
-            self.params.unset('fixed', 'station clock')
-            self.params.unset('fixed', 'sensor clock')
+        if params:
+            params.unset('fixed', 'station clock')
+            params.unset('fixed', 'sensor clock')
         if self.status:
             self._station_clock = eval(
                 self.status.get('clock', 'station', 'None'))
@@ -445,10 +368,6 @@ class weather_station(object):
         last_log = now - (old_data['delay'] * 60)
         last_status = None
         while True:
-            if not self._station_clock:
-                next_log = None
-            if not self._sensor_clock:
-                next_live = None
             now = time.time()
             # wake up just before next reading is due
             advance = now + max(self.avoid, self.min_pause) + self.min_pause
@@ -480,7 +399,7 @@ class weather_station(object):
             last_status = new_data['status']
             # 'good' time stamp if we haven't just woken up from long
             # pause and data read wasn't delayed
-            valid_time = data_time - last_data_time < (self.min_pause * 2.0) - 0.1
+            valid_time = data_time - last_data_time < self.margin
             # make sure changes because of logging interval aren't
             # mistaken for new live data
             if new_data['delay'] >= read_period:
@@ -495,18 +414,22 @@ class weather_station(object):
                 result = dict(new_data)
                 if valid_time:
                     # data has just changed, so definitely at a 48s update time
-                    self._sensor_clock = data_time
-                    self.logger.warning(
-                        'setting sensor clock %g', data_time % live_interval)
-                    if self.status:
-                        self.status.set(
-                            'clock', 'sensor', str(self._sensor_clock))
+                    if self._sensor_clock:
+                        diff = (data_time - self._sensor_clock) % live_interval
+                        if diff > 2.0 and diff < (live_interval - 2.0):
+                            self.logger.error('unexpected sensor clock change')
+                            self._sensor_clock = None
+                    if not self._sensor_clock:
+                        self._sensor_clock = data_time
+                        self.logger.warning(
+                            'setting sensor clock %g', data_time % live_interval)
+                        if self.status:
+                            self.status.set(
+                                'clock', 'sensor', str(self._sensor_clock))
                     if not next_live:
                         self.logger.warning('live_data live synchronised')
-                    else:
-                        self.logger.error('unexpected sensor clock setting')
                     next_live = data_time
-                elif next_live and data_time < next_live - self.min_pause:
+                elif next_live and data_time < next_live - self.margin:
                     self.logger.warning(
                         'live_data lost sync %g', data_time - next_live)
                     next_live = None
@@ -525,7 +448,7 @@ class weather_station(object):
             last_ptr_time = ptr_time
             new_ptr = self.current_pos()
             ptr_time = time.time()
-            valid_time = ptr_time - last_ptr_time < (self.min_pause * 2.0) - 0.1
+            valid_time = ptr_time - last_ptr_time < self.margin
             if new_ptr != old_ptr:
                 self.logger.debug('live_data new ptr: %06x', new_ptr)
                 last_log = ptr_time
@@ -535,16 +458,22 @@ class weather_station(object):
                 result = dict(new_data)
                 if valid_time:
                     # pointer has just changed, so definitely at a logging time
-                    self._station_clock = ptr_time
-                    self.logger.warning(
-                        'setting station clock %g', ptr_time % 60.0)
-                    if self.status:
-                        self.status.set(
-                            'clock', 'station', str(self._station_clock))
+                    if self._station_clock:
+                        diff = (ptr_time - self._station_clock) % 60
+                        if diff > 2 and diff < 58:
+                            self.logger.error('unexpected station clock change')
+                            self._station_clock = None
+                    if not self._station_clock:
+                        self._station_clock = ptr_time
+                        self.logger.warning(
+                            'setting station clock %g', ptr_time % 60.0)
+                        if self.status:
+                            self.status.set(
+                                'clock', 'station', str(self._station_clock))
                     if not next_log:
                         self.logger.warning('live_data log synchronised')
                     next_log = ptr_time
-                elif next_log and ptr_time < next_log - self.min_pause:
+                elif next_log and ptr_time < next_log - self.margin:
                     self.logger.warning(
                         'live_data lost log sync %g', ptr_time - next_log)
                     next_log = None
@@ -553,10 +482,6 @@ class weather_station(object):
                     result['idx'] = datetime.utcfromtimestamp(int(next_log))
                     next_log += log_interval
                     yield result, old_ptr, True
-                if new_ptr != self.inc_ptr(old_ptr):
-                    self.logger.error(
-                        'live_data unexpected ptr change %06x -> %06x',
-                        old_ptr, new_ptr)
                 old_ptr = new_ptr
                 old_data['delay'] = 0
                 data_time = 0
@@ -629,10 +554,11 @@ class weather_station(object):
         if new_ptr == self._current_ptr:
             return self._current_ptr
         if self._current_ptr and new_ptr != self.inc_ptr(self._current_ptr):
+            self.logger.error(
+                'unexpected ptr change %06x -> %06x', self._current_ptr, new_ptr)
             for k in self.reading_len:
                 if (new_ptr - self._current_ptr) == self.reading_len[k]:
-                    self.logger.warning(
-                        'type change %s -> %s', self.ws_type, k)
+                    self.logger.warning('type change %s -> %s', self.ws_type, k)
                     self.ws_type = k
                     break
         self._current_ptr = new_ptr
@@ -674,7 +600,7 @@ class weather_station(object):
                     self._sensor_clock = None
                 else:
                     pause = min(pause, (self.avoid - phase) % 48)
-            if pause > self.avoid * 2.0:
+            if pause >= self.avoid * 2.0:
                 return
             self.logger.debug('avoid %s', str(pause))
             time.sleep(pause)

@@ -23,6 +23,8 @@
 
 """
 
+import math
+
 # rename imports to prevent them being imported when
 # doing 'from pywws.conversions import *'
 from pywws import Localisation as _Localisation
@@ -38,6 +40,30 @@ def pressure_inhg(hPa):
     if hPa is None:
         return None
     return hPa / 33.86389
+
+def pressure_trend_text(trend):
+    """Convert pressure trend to a string, as used by the UK met
+    office.
+
+    """
+    _ = _Localisation.translation.gettext
+    if trend > 6.0:
+        return _('rising very rapidly')
+    elif trend > 3.5:
+        return _('rising quickly')
+    elif trend > 1.5:
+        return _('rising')
+    elif trend >= 0.1:
+        return _('rising slowly')
+    elif trend < -6.0:
+        return _('falling very rapidly')
+    elif trend < -3.5:
+        return _('falling quickly')
+    elif trend < -1.5:
+        return _('falling')
+    elif trend <= -0.1:
+        return _('falling slowly')
+    return _('steady')
 
 def rain_inch(mm):
     "Convert rainfall from millimetres to inches"
@@ -104,6 +130,18 @@ def wind_bft(ms):
             return bft
     return len(_bft_threshold)
 
+def dew_point(temp, hum):
+    """Compute dew point, using formula from
+    http://en.wikipedia.org/wiki/Dew_point.
+
+    """
+    if temp is None or hum is None:
+        return None
+    a = 17.27
+    b = 237.7
+    gamma = ((a * temp) / (b + temp)) + math.log(float(hum) / 100.0)
+    return (b * gamma) / (a - gamma)
+
 def cadhumidex(temp, humidity):
     "Calculate Humidity Index as per Canadian Weather Standards"
     if temp is None or humidity is None:
@@ -164,6 +202,57 @@ def max_dec_length(input, max_length=0):
         if abs(input) >= pow(10, max_length):
             return None
     return input
+
+def usaheatindex(temp, humidity, dew):
+    """Calculate Heat Index as per USA National Weather Service Standards
+
+    See http://en.wikipedia.org/wiki/Heat_index, formula 1. The
+    formula is not valid for T < 26.7C, Dew Point < 12C, or RH < 40%
+
+    """
+    if temp is None or humidity is None:
+        return None
+    if temp < 26.7 or humidity < 40 or dew < 12.0:
+        return temp
+    T = (temp * 1.8) + 32.0
+    R = humidity
+    c_1 = -42.379
+    c_2 = 2.04901523
+    c_3 = 10.14333127
+    c_4 = -0.22475541
+    c_5 = -0.00683783
+    c_6 = -0.05481717
+    c_7 = 0.00122874
+    c_8 = 0.00085282
+    c_9 = -0.00000199
+    return ((c_1 + (c_2 * T) + (c_3 * R) + (c_4 * T * R) + (c_5 * (T**2)) +
+             (c_6 * (R**2)) + (c_7 * (T**2) * R) + (c_8 * T * (R**2)) +
+             (c_9 * (T**2) * (R**2))) - 32.0) / 1.8
+
+def wind_chill(temp, wind):
+    """Compute wind chill, using formula from
+    http://en.wikipedia.org/wiki/wind_chill
+
+    """
+    if temp is None or wind is None:
+        return None
+    wind_kph = wind * 3.6
+    if wind_kph <= 4.8 or temp > 10.0:
+        return temp
+    return min(13.12 + (temp * 0.6215) +
+               (((0.3965 * temp) - 11.37) * (wind_kph ** 0.16)),
+               temp)
+
+def apparent_temp(temp, rh, wind):
+    """Compute apparent temperature (real feel), using formula from
+    http://www.bom.gov.au/info/thermal_stress/
+
+    """
+    if temp is None or rh is None or wind is None:
+        return None
+    vap_press = (float(rh) / 100.0) * 6.105 * math.exp(
+        17.27 * temp / (237.7 + temp))
+    return temp + (0.33 * vap_press) - (0.70 * wind) - 4.00
 
 def _main(argv=None):
     global _winddir_text_array

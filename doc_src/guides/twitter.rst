@@ -22,11 +22,8 @@ How to configure pywws to post messages to Twitter
 Install dependencies
 --------------------
 
-* Python 2.5+ - http://python.org/ (Note: Python 3 is not supported.)
-* tweepy 2.0+ - https://github.com/tweepy/tweepy
-* simplejson - http://pypi.python.org/pypi/simplejson/
-
-Note that simplejson is included in Python 2.6+
+Posting to Twitter requires some extra software.
+See :doc:`../essentials/dependencies` - :ref:`dependencies-twitter`.
 
 Create a Twitter account
 ------------------------
@@ -37,6 +34,9 @@ This could be useful to someone who lives in your area, but doesn't want to know
 Authorise pywws to post to your Twitter account
 -----------------------------------------------
 
+If you run pywws on a low power device such as a router, you may find it easier to run this authorisation step on another computer, as long as it has ``python-oauth2`` installed.
+Use an empty 'data' directory -- a ``weather.ini`` file will be created whose contents can be copied into your real ``weather.ini`` file using any text editor.
+
 Make sure no other pywws software is running, then run :py:mod:`~pywws.TwitterAuth`::
 
    python -m pywws.TwitterAuth /data/weather
@@ -46,7 +46,11 @@ Make sure no other pywws software is running, then run :py:mod:`~pywws.TwitterAu
 This will open a web browser window (or give you a URL to copy to your web browser) where you can log in to your Twitter account and authorise pywws to post.
 Your web browser will then show a 7 digit number which you need to copy to the :py:mod:`~pywws.TwitterAuth` program.
 If successful, your ``weather.ini`` file will now have a ``[twitter]`` section with ``secret`` and ``key`` entries.
-(Don't disclose these to anyone else.)
+(Don't disclose these to anyone else.).::
+
+   [twitter]
+   secret = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   key = xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Add location data (optional)
 ----------------------------
@@ -90,10 +94,16 @@ For example::
 
    [hourly]
    services = []
-   twitter = ['tweet.txt']
    plot = ['7days.png.xml', '24hrs.png.xml', 'rose_12hrs.png.xml']
-   text = ['24hrs.txt', '6hrs.txt', '7days.txt', 'allmonths.txt ']
+   text = [('tweet.txt', 'T'), '24hrs.txt', '6hrs.txt', '7days.txt']
+
+Note the use of the ``'T'`` flag -- this tells pywws to tweet the template result instead of uploading it to your ftp site.
 
 You could change the ``[logged]``, ``[12 hourly]`` or ``[daily]`` sections instead, but I think ``[hourly]`` is most appropriate for Twitter updates.
+
+.. versionchanged:: 13.06_r1015
+   added the ``'T'`` flag.
+   Previously Twitter templates were listed separately in ``twitter`` entries in the ``[hourly]`` and other sections.
+   The older syntax still works, but is deprecated.
 
 Comments or questions? Please subscribe to the pywws mailing list http://groups.google.com/group/pywws and let us know.
