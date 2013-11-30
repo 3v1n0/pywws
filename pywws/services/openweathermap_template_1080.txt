@@ -28,6 +28,7 @@
 #latitude     "'lat'          : '%f',"#
 #longitude    "'long'         : '%f',"#
 #calc "rain_hour(data)" "'rain_1h' : '%.1f',"#
+#calc "rain_24(data)" "'rain_24h' : '%.1f',"#
 #calc "rain_day(data)" "'rain_today' : '%.1f',"#
 #calc "dew_point(data['temp_out'], data['hum_out'])" "'dewpoint' : '%.1f',"#
 }
