@@ -365,7 +365,7 @@ class ToService(object):
                 else:
                     response = self.do_aprs_request(coded_data)
 
-                if response and len(response) == len(self.expected_result):
+                if response is not None and len(response) == len(self.expected_result):
                     for actual, expected in zip(response, self.expected_result):
                         if not re.match(expected, actual):
                             break
