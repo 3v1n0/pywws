@@ -163,6 +163,7 @@ import socket
 import sys
 import urllib
 import urllib2
+from urlparse import urlparse
 from datetime import datetime, timedelta
 
 from pywws import DataStore
@@ -237,10 +238,7 @@ class ToService(object):
         # get other parameters
         self.catchup = service_params.getint('config', 'catchup')
         self.use_get = eval(service_params.get('config', 'use get'))
-
-        self.use_aprs = False
-        if service_params.has_option('config', 'use aprs'):
-            self.use_aprs = eval(service_params.get('config', 'use aprs'))
+        self.use_aprs = urlparse(self.server).scheme == 'aprs'
 
         self.min_wait = 0
         if service_params.has_option('config', 'minwait'):
@@ -282,8 +280,8 @@ class ToService(object):
 
         return coded_data
 
-    def do_http_request(self, coded_data):
-        """Perform an HTTP Request to the server with data"""
+    def send_standard_data(self, coded_data):
+        """Perform a standard URL Request to the server with data"""
         coded_data = urllib.urlencode(coded_data)
         try:
             if self.use_get:
@@ -300,10 +298,10 @@ class ToService(object):
 
         return response
 
-    def do_aprs_request(self, coded_data):
+    def send_aprs_data(self, coded_data):
         """Connects to APRS server and sends data packets"""
         result = []
-        host, port = self.server.split(':')
+        host, port = urlparse(self.server).netloc.split(':')
         sock = socket.socket()
         self.logger.debug('Connecting to server %s' % self.server)
         try:
@@ -361,9 +359,9 @@ class ToService(object):
         for n in range(3):
             try:
                 if not self.use_aprs:
-                    response = self.do_http_request(coded_data)
+                    response = self.send_standard_data(coded_data)
                 else:
-                    response = self.do_aprs_request(coded_data)
+                    response = self.send_aprs_data(coded_data)
 
                 if len(response) == len(self.expected_result):
                     for actual, expected in zip(response, self.expected_result):
