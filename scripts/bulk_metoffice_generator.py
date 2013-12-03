@@ -18,6 +18,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+"""Regenerate hourly and daily summary data
+This script generates csv reports in WOW format for Metoffice bulk uploads.
+Based on http://wow.metoffice.gov.uk/support/dataformats#bulk
+"""
+
 __usage__ = """
  usage: python bulk_metoffice_generator.py [options] data_dir out_file.csv
  options are:
