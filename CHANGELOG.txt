@@ -1,6 +1,6 @@
 pywws - Python software for USB Wireless Weather Stations
 http://github.com/jim-easterbrook/pywws
-Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,6 +15,45 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+Changes in v14.06:
+    1/ Can now send images to Twitter.
+    2/ Periodic tasks can be specified with a cron style syntax.
+    3/ Added wind direction filter for use in graphs or user calibration
+       modules.
+    4/ Started using "Transifex" to host translations. Changed tools and
+       procedures to create new translations.
+    5/ Improved USB hangup avoidance strategy for stations with large clock
+       drift figures.
+    6/ Various bug fixes and minor improvements.
+
+Changes in v14.05:
+    1/ Rearranged package layout, moving examples and documentation.
+    2/ Added 'entry point' auto-generated commands for some modules.
+    3/ Added verbose output option to pywws-version command.
+    4/ Various bug fixes and minor improvements.
+
+Changes in v14.03:
+    1/ Extracts additional status from 'wind_dir' byte. You must run
+       pywws-reprocess.py with the -u option after upgrading from any previous
+       version.
+    2/ Added Citizen Weather Observer Program to available 'services'.
+    3/ Improved asynchronous upload task queuing.
+    4/ Various bug fixes and minor improvements.
+
+Changes in v14.02:
+    1/ Improved time zone handling, including non whole hour time zones.
+    2/ New 'frequent writes' config option.
+    3/ Improved 'live log' sync, particularly with 3080 type stations.
+    4/ Record recent memory pointer to improve detection of gaps in data.
+    5/ Various bug fixes and minor improvements.
+
+Changes in v13.12:
+    1/ Changed API of user calibration module.
+    2/ Can use python-twitter *or* tweepy library.
+    3/ Added a script to run live logging as a UNIX daemon process.
+    4/ Changed data store to use separate read and write caches.
+    5/ Various bug fixes and minor improvements.
 
 Changes in v13.10:
     1/ Changed Twitter library from tweepy to python-twitter.

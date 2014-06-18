@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,11 +23,16 @@
 
 """
 
+from __future__ import absolute_import
+
+__docformat__ = "restructuredtext en"
+
 import math
 
 # rename imports to prevent them being imported when
 # doing 'from pywws.conversions import *'
-from pywws import Localisation as _Localisation
+from . import Localisation as _Localisation
+from .Process import WindFilter as _WindFilter
 
 def illuminance_wm2(lux):
     "Approximate conversion of illuminance in lux to solar radiation in W/m2"
@@ -77,6 +82,65 @@ def temp_f(c):
         return None
     return (c * 9.0 / 5.0) + 32.0
 
+def winddir_average(data, threshold, min_count, decay=1.0):
+    """Compute average wind direction (in degrees) for a slice of data.
+
+    The wind speed and direction of each data item is converted to a
+    vector before averaging, so the result reflects the dominant wind
+    direction during the time period covered by the data.
+
+    Setting the ``decay`` parameter converts the filter from a simple
+    averager to one where the most recent sample carries the highest
+    weight, and earlier samples have a lower weight according to how
+    long ago they were.
+
+    This process is an approximation of "exponential smoothing". See
+    `Wikipedia <http://en.wikipedia.org/wiki/Exponential_smoothing>`_
+    for a detailed discussion.
+
+    The parameter ``decay`` corresponds to the value ``(1 - alpha)``
+    in the Wikipedia description. Because the weather data being
+    smoothed may not be at regular intervals this parameter is the
+    decay over 5 minutes. Weather data at other intervals will have
+    its weight scaled accordingly.
+
+    :note: The return value is in degrees, not the 0..15 range used
+        elsewhere in pywws.
+
+    :param data: a slice of pywws raw/calib or hourly data.
+
+    :type data: pywws.DataStore.core_store
+
+    :param threshold: minimum average windspeed for there to be a
+        valid wind direction.
+
+    :type threshold: float
+
+    :param min_count: minimum number of data items for there to be a
+        valid wind direction.
+
+    :type min_count: int
+
+    :param decay: filter coefficient decay rate.
+
+    :type decay: float
+
+    :rtype: float
+    
+    """
+    wind_filter = _WindFilter()
+    count = 0
+    for item in data:
+        wind_filter.add(item)
+        if item['wind_dir'] is not None:
+            count += 1
+    if count < min_count:
+        return None
+    speed, direction = wind_filter.result()
+    if speed is None or speed < threshold:
+        return None
+    return direction * 22.5
+    
 def winddir_degrees(pts):
     "Convert wind direction from 0..15 to degrees"
     if pts is None:
@@ -90,6 +154,8 @@ def winddir_text(pts):
     global _winddir_text_array
     if pts is None:
         return None
+    if not isinstance(pts, int):
+        pts = int(pts + 0.5) % 16
     if not _winddir_text_array:
         _ = _Localisation.translation.gettext
         _winddir_text_array = (

@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,41 +20,43 @@
 
 """Test connection to weather station.
 
+This script can also be run with the ``pywws-testweatherstation``
+command. ::
+%s
 This is a simple utility to test communication with the weather
 station. If this doesn't work, then there's a problem that needs to be
 sorted out before trying any of the other programs. Likely problems
 include not properly installing the USB libraries, or a permissions
 problem. The most unlikely problem is that you forgot to connect the
-weather station to your computer! ::
+weather station to your computer!
 
-%s
 """
+
+from __future__ import absolute_import
 
 __usage__ = """
- usage: python -m pywws.TestWeatherStation [options]
+ usage: %s [options]
  options are:
-       --help           display this help
-  -c | --change         display any changes in "fixed block" data
-  -d | --decode         display meaningful values instead of raw data
-  -h | --history count  display the last "count" readings
-  -l | --live           display 'live' data
-  -m | --logged         display 'logged' data
-  -u | --unknown        display unknown fixed block values
-  -v | --verbose        increase amount of reassuring messages
-                        (repeat for even more messages e.g. -vvv)
+         --help       display this help
+  -c   | --change     display any changes in "fixed block" data
+  -d   | --decode     display meaningful values instead of raw data
+  -h n | --history n  display the last "n" readings
+  -l   | --live       display 'live' data
+  -m   | --logged     display 'logged' data
+  -u   | --unknown    display unknown fixed block values
+  -v   | --verbose    increase amount of reassuring messages
+                      (repeat for even more messages e.g. -vvv)
 """
 
-__doc__ %= __usage__
-
-__usage__ = __doc__.split('\n')[0] + __usage__
+__doc__ %= __usage__ % ('python -m pywws.TestWeatherStation')
 
 import datetime
 import getopt
 import sys
 import time
 
-from pywws.Logger import ApplicationLogger
-from pywws import WeatherStation
+from .Logger import ApplicationLogger
+from . import WeatherStation
 
 def raw_dump(pos, data):
     print "%04x" % pos,
@@ -64,6 +66,7 @@ def raw_dump(pos, data):
 def main(argv=None):
     if argv is None:
         argv = sys.argv
+    usage = (__usage__ % (argv[0])).strip()
     try:
         opts, args = getopt.getopt(
             argv[1:], "cdh:lmuv",
@@ -71,12 +74,12 @@ def main(argv=None):
              'unknown', 'verbose'))
     except getopt.error, msg:
         print >>sys.stderr, 'Error: %s\n' % msg
-        print >>sys.stderr, __usage__.strip()
+        print >>sys.stderr, usage
         return 1
     # check arguments
     if len(args) != 0:
         print >>sys.stderr, 'Error: no arguments allowed\n'
-        print >>sys.stderr, __usage__.strip()
+        print >>sys.stderr, usage
         return 2
     # process options
     change = False
@@ -88,7 +91,8 @@ def main(argv=None):
     verbose = 0
     for o, a in opts:
         if o == '--help':
-            print __usage__.strip()
+            print __doc__.split('\n\n')[0]
+            print usage
             return 0
         elif o in ('-c', '--change'):
             change = True

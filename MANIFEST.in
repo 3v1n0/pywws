@@ -1,10 +1,6 @@
-include *.txt MANIFEST.in README.md
-recursive-include translations *.po
+include *.txt
+include *.md
+recursive-include .tx *
 recursive-include doc_src *
-recursive-include doc *
-recursive-include examples *
-global-exclude *~
-exclude doc/html/*/html/.buildinfo
+recursive-include pywws/lang *.po
 prune doc_src/api
-prune doc/html/*/doctrees
-prune pywws.egg-info

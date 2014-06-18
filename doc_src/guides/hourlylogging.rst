@@ -1,6 +1,6 @@
 .. pywws - Python software for USB Wireless Weather Stations
    http://github.com/jim-easterbrook/pywws
-   Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+   Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -23,12 +23,12 @@ Introduction
 ------------
 
 There are two quite different modes of operation with pywws.
-Traditionally :py:mod:`~pywws.Hourly` would be run at regular intervals (usually an hour) from cron.
+Traditionally :py:mod:`pywws.Hourly` would be run at regular intervals (usually an hour) from cron.
 This is suitable for fairly static websites, but more frequent updates can be useful for sites such as Weather Underground (http://www.wunderground.com/).
-The newer :py:mod:`~pywws.LiveLog` program runs continuously and can upload data every 48 seconds.
+The newer :py:mod:`pywws.LiveLog` program runs continuously and can upload data every 48 seconds.
 
-Note that although this document (and the program name) refers to 'hourly' logging, you can run  :py:mod:`~pywws.Hourly` as often or as infrequently as you like, but don't try to run it more often than double your logging interval.
-For example, if your logging interval is 10 minutes, don't run :py:mod:`~pywws.Hourly` more often than every 20 minutes.
+Note that although this document (and the program name) refers to 'hourly' logging, you can run  :py:mod:`pywws.Hourly` as often or as infrequently as you like, but don't try to run it more often than double your logging interval.
+For example, if your logging interval is 10 minutes, don't run :py:mod:`pywws.Hourly` more often than every 20 minutes.
 
 Getting started
 ---------------
@@ -36,11 +36,15 @@ Getting started
 First of all, you need to install pywws and make sure it can get data from your weather station.
 See :doc:`getstarted` for details.
 
-Try running :py:mod:`~pywws.Hourly` from the command line, with a high level of verbosity so you can see what's happening::
+Try running :py:mod:`pywws.Hourly` from the command line, with a high level of verbosity so you can see what's happening.
+Use the ``pywws-hourly`` command to run :py:mod:`pywws.Hourly`::
 
-   python -m pywws.Hourly -vvv ~/weather/data
+   pywws-hourly -vvv ~/weather/data
 
 Within five minutes (assuming you have set a 5 minute logging interval) you should see a 'live_data new ptr' message, followed by fetching any new data from the weather station and processing it.
+
+.. versionchanged:: 14.04.dev1194
+   the ``pywws-hourly`` command replaced ``scripts/pywws-hourly.py``.
 
 Configuring file locations
 --------------------------
@@ -60,7 +64,10 @@ Don't use the pywws example directories for your templates, as they will get ove
 
 Copy your text and graph templates to the appropriate directories.
 You may find some of the examples provided with pywws useful to get started.
-If you installed pywws with ``pip`` the examples should be in ``/usr/share/pywws`` or ``/usr/local/share/pywws`` or similar.
+The ``pywws-version -v`` command should show you where the examples are on your computer.
+
+.. versionadded:: 14.04.dev1194
+   the ``pywws-version`` command.
 
 Configuring periodic tasks
 --------------------------
@@ -75,7 +82,7 @@ In weather.ini you should have ``[logged]``, ``[hourly]``, ``[12 hourly]`` and `
    [hourly]
    ...
 
-These specify what :py:mod:`~pywws.Hourly` should do when it is run.
+These specify what :py:mod:`pywws.Hourly` should do when it is run.
 Tasks in the ``[logged]`` section are done every time there is new logged data, tasks in the ``[hourly]`` section are done every hour, tasks in the ``[12 hourly]`` section are done twice daily and tasks in the ``[daily]`` section are done once per day.
 
 The ``services`` entry is a list of online weather services to upload data to.
@@ -104,9 +111,14 @@ Add the names of your template files and weather services to the appropriate ent
 
 Note the use of the ``'T'`` flag -- this tells pywws to send the template result to Twitter instead of uploading it to your ftp site.
 
-You can test that all these are working by removing the ``[last update]`` section from status.ini, then running :py:mod:`~pywws.Hourly` again::
+You can test that all these are working by removing the ``[last update]`` section from status.ini, then running :py:mod:`pywws.Hourly` again::
 
-   python -m pywws.Hourly -v ~/weather/data
+   pywws-hourly -v ~/weather/data
+
+.. versionadded:: 14.05.dev1211
+   ``[cron name]`` sections.
+   If you need more flexibility in when tasks are done you can use ``[cron name]`` sections.
+   See :doc:`weather_ini` for more detail.
 
 .. versionchanged:: 13.06_r1015
    added the ``'T'`` flag.
@@ -114,46 +126,36 @@ You can test that all these are working by removing the ``[last update]`` sectio
    The older syntax still works, but is deprecated.
 
 .. versionchanged:: 13.05_r1009
-   The last update information was previously stored in weather.ini, with ``last update`` entries in several sections.
-
-Using a utility script
-----------------------
-
-The pywws installation includes a short script ``pywws-hourly.py`` that gets installed in ``/usr/bin`` or ``/usr/local/bin`` or similar.
-You should be able to use this script to run :py:mod:`~pywws.Hourly`::
-
-   pywws-hourly.py -v ~/weather/data
+   the last update information was previously stored in weather.ini, with ``last update`` entries in several sections.
 
 Run as a cron job
 -----------------
 
 Most UNIX/Linux systems have a 'cron' daemon that can run programs at certain times, even if you are not logged in to the computer.
 You edit a 'crontab' file to specify what to run and when to run  it.
-For example, to run :py:mod:`~pywws.Hourly` every hour, at zero minutes past the hour::
+For example, to run :py:mod:`pywws.Hourly` every hour, at zero minutes past the hour::
 
-   0 * * * *       pywws-hourly.py /home/jim/weather/data
+   0 * * * *       pywws-hourly /home/xxx/weather/data
 
 This might work, but if it didn't you probably won't get any error messages to tell you what went wrong.
-It's much better to run a script that runs :py:mod:`~pywws.Hourly` and then emails you any output it produces.
+It's much better to run a script that runs :py:mod:`pywws.Hourly` and then emails you any output it produces.
 Here's the script I use::
 
    #!/bin/sh
    #
    # weather station logger calling script
 
-   if [ ! -d /data/weather/ ]; then
+   export PATH=$PATH:/usr/local/bin
+
+   if [ ! -d ~/weather/data/ ]; then
      exit
      fi
 
    log=/var/log/log-weather
 
-   pywws-hourly.py -v /data/weather >$log 2>&1
+   pywws-hourly -v ~/weather/data >$log 2>&1
 
    # mail the log file
    /home/jim/scripts/email-log.sh $log "weather log"
 
 You’ll need to edit this quite a lot to suit your file locations and so on, but it gives some idea of what to do.
-
-----
-
-Comments or questions? Please subscribe to the pywws mailing list http://groups.google.com/group/pywws and let us know.

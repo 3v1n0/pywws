@@ -20,6 +20,11 @@ develop-eggs
 doc/html/*/
 doc/text
 doc_src/api/pywws.*.rst
+pywws/doc/*
+doc_src/api/pywws.*.rst
+
+# Compiled language files
+*.mo
 
 # Miscellaneous
 MANIFEST

@@ -3,7 +3,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -62,6 +62,8 @@ a more useful total in the last hour, day or month.
 
 """
 
+from __future__ import absolute_import
+
 __docformat__ = "restructuredtext en"
 __usage__ = """
  usage: python -m pywws.Process [options] data_dir
@@ -81,14 +83,14 @@ import math
 import os
 import sys
 
-from pywws.calib import Calib
-from pywws import DataStore
-from pywws.Logger import ApplicationLogger
-from pywws.TimeZone import Local, utc
+from .calib import Calib
+from . import DataStore
+from .Logger import ApplicationLogger
+from .TimeZone import STDOFFSET, HOUR
 
 SECOND = timedelta(seconds=1)
 TIME_ERR = timedelta(seconds=45)
-HOUR = timedelta(hours=1)
+MINUTEx5 = timedelta(minutes=5)
 HOURx3 = timedelta(hours=3)
 DAY = timedelta(hours=24)
 WEEK = timedelta(days=7)
@@ -147,6 +149,77 @@ sin_LUT = map(
 cos_LUT = map(
     lambda x: math.cos(math.radians(float(x * 360) / 16.0)), range(16))
 
+class WindFilter(object):
+    """Compute average wind speed and direction.
+
+    The wind speed and direction of each data item is converted to a
+    vector before averaging, so the result reflects the dominant wind
+    direction during the time period covered by the data.
+
+    Setting the ``decay`` parameter converts the filter from a simple
+    averager to one where the most recent sample carries the highest
+    weight, and earlier samples have a lower weight according to how
+    long ago they were.
+
+    This process is an approximation of "exponential smoothing". See
+    `Wikipedia <http://en.wikipedia.org/wiki/Exponential_smoothing>`_
+    for a detailed discussion.
+
+    The parameter ``decay`` corresponds to the value ``(1 - alpha)``
+    in the Wikipedia description. Because the weather data being
+    smoothed may not be at regular intervals this parameter is the
+    decay over 5 minutes. Weather data at other intervals will have
+    its weight scaled accordingly.
+
+    The return value is a (speed, direction) tuple.
+
+    :param decay: filter coefficient decay rate.
+
+    :type decay: float
+
+    :rtype: (float, float)
+    
+    """
+    def __init__(self, decay=1.0):
+        self.decay = decay
+        self.Ve = 0.0
+        self.Vn = 0.0
+        self.total = 0.0
+        self.weight = 1.0
+        self.total_weight = 0.0
+        self.last_idx = None
+
+    def add(self, data):
+        direction = data['wind_dir']
+        speed = data['wind_ave']
+        if direction is None or speed is None:
+            return
+        if self.last_idx and self.decay != 1.0:
+            interval = data['idx'] - self.last_idx
+            assert interval.days == 0
+            decay = self.decay
+            if interval != MINUTEx5:
+                decay = decay ** (float(interval.seconds) /
+                                  float(MINUTEx5.seconds))
+            self.weight = self.weight / decay
+        self.last_idx = data['idx']
+        speed = speed * self.weight
+        if isinstance(direction, int):
+            self.Ve -= speed * sin_LUT[direction]
+            self.Vn -= speed * cos_LUT[direction]
+        else:
+            direction = math.radians(float(direction) * 22.5)
+            self.Ve -= speed * math.sin(direction)
+            self.Vn -= speed * math.cos(direction)
+        self.total += speed
+        self.total_weight += self.weight
+
+    def result(self):
+        if self.total_weight == 0.0:
+            return (None, None)
+        return (self.total / self.total_weight,
+                (math.degrees(math.atan2(self.Ve, self.Vn)) + 180.0) / 22.5)
+
 class HourAcc(object):
     """'Accumulate' raw weather data to produce hourly summary.
 
@@ -157,31 +230,19 @@ class HourAcc(object):
     def __init__(self, last_rain):
         self.logger = logging.getLogger('pywws.Process.HourAcc')
         self.last_rain = last_rain
-        self.wind_dir = list()
-        for i in range(16):
-            self.wind_dir.append(0.0)
         self.copy_keys = ['idx', 'hum_in', 'temp_in', 'hum_out', 'temp_out',
                           'abs_pressure', 'rel_pressure']
         self.reset()
 
     def reset(self):
-        for i in range(16):
-            self.wind_dir[i] = 0.0
-        self.wind_acc = 0.0
+        self.wind_fil = WindFilter()
         self.wind_gust = (-2.0, None)
         self.rain = 0.0
-        self.wind_count = 0
-        self.retval = dict()
+        self.retval = {'idx' : None, 'temp_out' : None}
 
     def add_raw(self, data):
         idx = data['idx']
-        wind_ave = data['wind_ave']
-        if wind_ave is not None:
-            wind_dir = data['wind_dir']
-            if wind_dir is not None:
-                self.wind_dir[wind_dir] += wind_ave
-            self.wind_acc += wind_ave
-            self.wind_count += 1
+        self.wind_fil.add(data)
         wind_gust = data['wind_gust']
         if wind_gust is not None and wind_gust > self.wind_gust[0]:
             self.wind_gust = (wind_gust, idx)
@@ -204,29 +265,15 @@ class HourAcc(object):
             self.copy_keys.append('illuminance')
             self.copy_keys.append('uv')
         # if near the end of the hour, ignore 'lost contact' readings
-        if data['idx'].minute < 45 or data['temp_out'] is not None:
+        if (data['idx'].minute < 45 or data['temp_out'] is not None or
+                                self.retval['temp_out'] is None):
             for key in self.copy_keys:
                 self.retval[key] = data[key]
 
     def result(self):
-        if not self.retval:
+        if not self.retval['idx']:
             return None
-        if self.wind_count > 0:
-            # convert weighted wind directions to a vector
-            Ve = 0.0
-            Vn = 0.0
-            for dir in range(16):
-                val = self.wind_dir[dir]
-                Ve -= val * sin_LUT[dir]
-                Vn -= val * cos_LUT[dir]
-            # get direction of total vector
-            dir_ave = (math.degrees(math.atan2(Ve, Vn)) + 180.0) * 16.0 / 360.0
-            self.retval['wind_dir'] = int(dir_ave + 0.5) % 16
-            wind_ave = self.wind_acc / float(self.wind_count)
-            self.retval['wind_ave'] = wind_ave
-        else:
-            self.retval['wind_dir'] = None
-            self.retval['wind_ave'] = None
+        self.retval['wind_ave'], self.retval['wind_dir'] = self.wind_fil.result()
         if self.wind_gust[1]:
             self.retval['wind_gust'] = self.wind_gust[0]
         else:
@@ -246,23 +293,16 @@ class DayAcc(object):
     "day end hour" setting.
 
     """
-    def __init__(self, daytime):
+    def __init__(self):
         self.logger = logging.getLogger('pywws.Process.DayAcc')
-        self._daytime = daytime
         self.has_illuminance = False
-        self.wind_dir = list()
-        for i in range(16):
-            self.wind_dir.append(0.0)
         self.ave = {}
         self.max = {}
         self.min = {}
         self.reset()
 
     def reset(self):
-        for i in range(16):
-            self.wind_dir[i] = 0.0
-        self.wind_acc = 0.0
-        self.wind_count = 0
+        self.wind_fil = WindFilter()
         self.wind_gust = (-1.0, None)
         self.rain = 0.0
         for i in ('temp_in', 'temp_out', 'hum_in', 'hum_out',
@@ -277,6 +317,7 @@ class DayAcc(object):
 
     def add_raw(self, data):
         idx = data['idx']
+        local_hour = (idx + STDOFFSET).hour
         wind_gust = data['wind_gust']
         if wind_gust is not None and wind_gust > self.wind_gust[0]:
             self.wind_gust = (wind_gust, idx)
@@ -284,7 +325,7 @@ class DayAcc(object):
             temp = data[i]
             if temp is not None:
                 self.ave[i].add(temp)
-                if self._daytime[idx.hour]:
+                if local_hour >= 9 and local_hour < 21:
                     # daytime max temperature
                     self.max[i].add(temp, idx)
                 else:
@@ -305,13 +346,7 @@ class DayAcc(object):
                     self.max[i].add(value, idx)
 
     def add_hourly(self, data):
-        wind_ave = data['wind_ave']
-        if wind_ave is not None:
-            wind_dir = data['wind_dir']
-            if wind_dir is not None:
-                self.wind_dir[wind_dir] += wind_ave
-            self.wind_acc += wind_ave
-            self.wind_count += 1
+        self.wind_fil.add(data)
         rain = data['rain']
         if rain is not None:
             self.rain += rain
@@ -320,22 +355,7 @@ class DayAcc(object):
     def result(self):
         if not self.retval:
             return None
-        if self.wind_count > 0:
-            # convert weighted wind directions to a vector
-            Ve = 0.0
-            Vn = 0.0
-            for dir in range(16):
-                val = self.wind_dir[dir]
-                Ve -= val * sin_LUT[dir]
-                Vn -= val * cos_LUT[dir]
-            # get direction of total vector
-            dir_ave = (math.degrees(math.atan2(Ve, Vn)) + 180.0) * 16.0 / 360.0
-            self.retval['wind_dir'] = int(dir_ave + 0.5) % 16
-            wind_ave = self.wind_acc / float(self.wind_count)
-            self.retval['wind_ave'] = wind_ave
-        else:
-            self.retval['wind_dir'] = None
-            self.retval['wind_ave'] = None
+        self.retval['wind_ave'], self.retval['wind_dir'] = self.wind_fil.result()
         if self.wind_gust[1]:
             self.retval['wind_gust'] = self.wind_gust[0]
         else:
@@ -374,9 +394,6 @@ class MonthAcc(object):
         self.max_lo = {}
         self.max_hi = {}
         self.max_ave = {}
-        self.wind_dir = list()
-        for i in range(16):
-            self.wind_dir.append(0.0)
         self.reset()
 
     def reset(self):
@@ -397,10 +414,7 @@ class MonthAcc(object):
             self.max_lo[i] = Minimum()
             self.max_hi[i] = Maximum()
             self.max_ave[i] = Average()
-        for i in range(16):
-            self.wind_dir[i] = 0.0
-        self.wind_acc = 0.0
-        self.wind_count = 0
+        self.wind_fil = WindFilter()
         self.wind_gust = (-1.0, None)
         self.rain = 0.0
         self.rain_days = 0
@@ -432,13 +446,7 @@ class MonthAcc(object):
             value = data['%s_max' % i]
             if value is not None:
                 self.max[i].add(value, data['%s_max_t' % i])
-        wind_ave = data['wind_ave']
-        if wind_ave is not None:
-            wind_dir = data['wind_dir']
-            if wind_dir is not None:
-                self.wind_dir[wind_dir] += wind_ave
-            self.wind_acc += wind_ave
-            self.wind_count += 1
+        self.wind_fil.add(data)
         wind_gust = data['wind_gust']
         if wind_gust is not None and wind_gust > self.wind_gust[0]:
             self.wind_gust = (wind_gust, data['wind_gust_t'])
@@ -483,22 +491,7 @@ class MonthAcc(object):
              result['%s_max_t' % i]) = self.max[i].result()
             (result['%s_min' % i],
              result['%s_min_t' % i]) = self.min[i].result()
-        if self.wind_count > 0:
-            # convert weighted wind directions to a vector
-            Ve = 0.0
-            Vn = 0.0
-            for dir in range(16):
-                val = self.wind_dir[dir]
-                Ve -= val * sin_LUT[dir]
-                Vn -= val * cos_LUT[dir]
-            # get direction of total vector
-            dir_ave = (math.degrees(math.atan2(Ve, Vn)) + 180.0) * 16.0 / 360.0
-            result['wind_dir'] = int(dir_ave + 0.5) % 16
-            wind_ave = self.wind_acc / float(self.wind_count)
-            result['wind_ave'] = wind_ave
-        else:
-            result['wind_dir'] = None
-            result['wind_ave'] = None
+        result['wind_ave'], result['wind_dir'] = self.wind_fil.result()
         if self.wind_gust[1]:
             result['wind_gust'] = self.wind_gust[0]
         else:
@@ -548,7 +541,10 @@ def generate_hourly(logger, calib_data, hourly_data, process_from):
             start = process_from
     if start is None:
         return start
+    # set start of hour in local time (not all time offsets are integer hours)
+    start += STDOFFSET
     start = start.replace(minute=0, second=0)
+    start -= STDOFFSET
     del hourly_data[start:]
     # preload pressure history, and find last valid rain
     prev = None
@@ -602,7 +598,7 @@ def generate_hourly(logger, calib_data, hourly_data, process_from):
         hour_start = hour_end
     return start
 
-def generate_daily(logger, day_end_hour, daytime,
+def generate_daily(logger, day_end_hour,
                    calib_data, hourly_data, daily_data, process_from):
     """Generate daily summaries from calibrated and hourly data."""
     start = daily_data.before(datetime.max)
@@ -616,14 +612,16 @@ def generate_daily(logger, day_end_hour, daytime,
             start = process_from
     if start is None:
         return start
-    # round to start of this day
+    # round to start of this day, in local time
+    start += STDOFFSET
     if start.hour < day_end_hour:
         start = start - DAY
     start = start.replace(hour=day_end_hour, minute=0, second=0)
+    start -= STDOFFSET
     del daily_data[start:]
     stop = calib_data.before(datetime.max)
     day_start = start
-    acc = DayAcc(daytime)
+    acc = DayAcc()
     count = 0
     while day_start <= stop:
         count += 1
@@ -644,7 +642,7 @@ def generate_daily(logger, day_end_hour, daytime,
         day_start = day_end
     return start
 
-def generate_monthly(logger, rain_day_threshold, day_end_hour, time_offset,
+def generate_monthly(logger, rain_day_threshold, day_end_hour,
                      daily_data, monthly_data, process_from):
     """Generate monthly summaries from daily data."""
     start = monthly_data.before(datetime.max)
@@ -659,15 +657,12 @@ def generate_monthly(logger, rain_day_threshold, day_end_hour, time_offset,
     if start is None:
         return start
     # set start to start of first day of month (local time)
-    if start.hour < day_end_hour:
-        start = start - DAY
-    start = start.replace(hour=day_end_hour, minute=0, second=0)
-    local_start = start + time_offset
-    local_start = local_start.replace(day=1)
-    if local_start.hour >= 12:
+    start += STDOFFSET
+    start = start.replace(day=1, hour=day_end_hour, minute=0, second=0)
+    if day_end_hour >= 12:
         # month actually starts on the last day of previous month
-        local_start -= DAY
-    start = local_start - time_offset
+        start -= DAY
+    start -= STDOFFSET
     del monthly_data[start:]
     stop = daily_data.before(datetime.max)
     month_start = start
@@ -711,19 +706,8 @@ def Process(params,
     last_raw = raw_data.before(datetime.max)
     if last_raw is None:
         raise IOError('No data found. Check data directory parameter.')
-    # get local time's offset from UTC, without DST
-    time_offset = Local.utcoffset(last_raw) - Local.dst(last_raw)
-    # set daytime end hour, in UTC
-    day_end_hour = eval(params.get('config', 'day end hour', '21'))
-    day_end_hour = (day_end_hour - (time_offset.seconds // 3600)) % 24
-    # divide 24 hours of UTC day into day and night
-    daytime = []
-    for i in range(24):
-        daytime.append(True)
-    night_hour = (21 - (time_offset.seconds // 3600)) % 24
-    for i in range(12):
-        daytime[night_hour] = False
-        night_hour = (night_hour + 1) % 24
+    # get daytime end hour (in local time)
+    day_end_hour = eval(params.get('config', 'day end hour', '21')) % 24
     # get other config
     rain_day_threshold = eval(params.get('config', 'rain day threshold', '0.2'))
     # calibrate raw data
@@ -731,10 +715,10 @@ def Process(params,
     # generate hourly data
     start = generate_hourly(logger, calib_data, hourly_data, start)
     # generate daily data
-    start = generate_daily(logger, day_end_hour, daytime,
+    start = generate_daily(logger, day_end_hour,
                            calib_data, hourly_data, daily_data, start)
     # generate monthly data
-    generate_monthly(logger, rain_day_threshold, day_end_hour, time_offset,
+    generate_monthly(logger, rain_day_threshold, day_end_hour,
                      daily_data, monthly_data, start)
     return 0
 

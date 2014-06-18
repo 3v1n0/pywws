@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -26,39 +26,19 @@
 Introduction
 ------------
 
-Several organisations allow weather stations to upload data using a
-simple HTTP 'POST' or 'GET' request, with the data encoded as a
-sequence of ``key=value`` pairs separated by ``&`` characters.
+There are an increasing number of web sites around the world that
+encourage amateur weather station owners to upload data over the
+internet.
 
 This module enables pywws to upload readings to these organisations.
 It is highly customisable using configuration files. Each 'service'
-requires a configuration file and two templates in ``pywws/services``
-(that should not need to be edited by the user) and a section in
-``weather.ini`` containing user specific data such as your site ID and
-password.
+requires a configuration file and one or two templates in
+``pywws/services`` (that should not need to be edited by the user) and
+a section in ``weather.ini`` containing user specific data such as
+your site ID and password.
 
-There are currently eight services for which configuration files have
-been written.
-
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| organisation                                                          | service name          | config file                                           |
-+=======================================================================+=======================+=======================================================+
-| `UK Met Office <http://wow.metoffice.gov.uk/>`_                       | ``metoffice``         | :download:`../../pywws/services/metoffice.ini`        |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `Citizen Weather Observer Program <http://www.wxqa.com/>`_            | ``cwop``              | :download:`../../pywws/services/cwop.ini`             |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `Open Weather Map <http://openweathermap.org/>`_                      | ``openweathermap``    | :download:`../../pywws/services/openweathermap.ini`   |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `PWS Weather <www.pwsweather.com>`_                                   | ``pwsweather``        | :download:`../../pywws/services/pwsweather.ini`       |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `Stacja Pogody <http://stacjapogody.waw.pl/index.php?id=mapastacji>`_ | ``stacjapogodywawpl`` | :download:`../../pywws/services/stacjapogodywawpl.ini`|
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `temperatur.nu <http://www.temperatur.nu/>`_                          | ``temperaturnu``      | :download:`../../pywws/services/temperaturnu.ini`     |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `Weather Underground <http://www.wunderground.com/>`_                 | ``underground``       | :download:`../../pywws/services/underground.ini`      |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
-| `wetter.com <http://www.wetter.com/community/>`_                      | ``wetterarchivde``    | :download:`../../pywws/services/wetterarchivde.ini`   |
-+-----------------------------------------------------------------------+-----------------------+-------------------------------------------------------+
+See :ref:`How to integrate pywws with various weather services
+<guides-integration-other>` for details of the available services.
 
 Configuration
 -------------
@@ -72,8 +52,9 @@ create a section in ``weather.ini``::
 
     python -m pywws.toservice data_dir service_name
 
-``service_name`` is a single word service name, such as ``metoffice``,
-``data_dir`` is your weather data directory, as usual.
+``service_name`` is the single word service name used by pywws, such
+as ``metoffice``, ``data_dir`` is your weather data directory, as
+usual.
 
 Edit ``weather.ini`` and find the section corresponding to the service
 name, e.g. ``[underground]``. Copy your site details into this
@@ -94,9 +75,7 @@ Upload old data
 ---------------
 
 Now you can upload your last 7 days' data, if the service supports it.
-Edit your ``status.ini`` file and remove the appropriate line from the
-``last update`` section, then run ``toservice`` with the catchup
-option::
+Run ``toservice`` with the catchup option::
 
     python -m pywws.toservice -cvv data_dir service_name
 
@@ -113,13 +92,13 @@ section, depending on how often you want to send data. For example::
     twitter = []
     plot = []
     text = []
-    services = ['underground_rf']
+    services = ['underground_rf', 'cwop']
 
     [logged]
     twitter = []
     plot = []
     text = []
-    services = ['metoffice', 'stacjapogodywawpl']
+    services = ['metoffice', 'cwop']
 
     [hourly]
     twitter = []
@@ -128,18 +107,20 @@ section, depending on how often you want to send data. For example::
     services = ['underground']
 
 Note that the ``[live]`` section is only used when running
-:py:mod:`~pywws.LiveLog`. It is a good idea to repeat any service
-selected in ``[live]`` in the ``[logged]`` or ``[hourly]`` section in
-case you switch to running :py:mod:`~pywws.Hourly`.
+:py:mod:`pywws.LiveLog`. It is a good idea to repeat any
+service selected in ``[live]`` in the ``[logged]`` or ``[hourly]``
+section in case you switch to running :py:mod:`pywws.Hourly`.
 
-Restart your regular pywws program (:py:mod:`~pywws.Hourly` or
-:py:mod:`~pywws.LiveLog`) and visit the appropriate web site to see
-regular updates from your weather station.
+Restart your regular pywws program (:py:mod:`pywws.Hourly` or
+:py:mod:`pywws.LiveLog`) and visit the appropriate web site to
+see regular updates from your weather station.
 
 API
 ---
 
 """
+
+from __future__ import absolute_import
 
 __docformat__ = "restructuredtext en"
 __usage__ = """
@@ -154,25 +135,26 @@ __usage__ = """
 __doc__ %= __usage__
 __usage__ = __doc__.split('\n')[0] + __usage__
 
+import base64
 from ConfigParser import SafeConfigParser
+from datetime import datetime, timedelta
 import getopt
 import logging
 import os
+import pkg_resources
 import re
 import socket
 import sys
 import urllib
 import urllib2
-from urlparse import urlparse
-from datetime import datetime, timedelta
+import urlparse
 
-from pywws import DataStore
-from pywws.Logger import ApplicationLogger
-from pywws import Template
-from pywws import version as VERSION
+from . import DataStore
+from .Logger import ApplicationLogger
+from . import Template
+from . import __version__
 
-FIVE_MINS = timedelta(minutes=5)
-FIFTY_SECS = timedelta(seconds=50)
+PARENT_MARGIN = timedelta(minutes=2)
 
 class ToService(object):
     """Upload weather data to weather services such as Weather
@@ -218,10 +200,18 @@ class ToService(object):
         # open params file
         service_params = SafeConfigParser()
         service_params.optionxform = str
-        service_params.readfp(open(os.path.join(
-            os.path.dirname(__file__), 'services', '%s.ini' % (self.service_name))))
+        service_params.readfp(pkg_resources.resource_stream(
+            'pywws', 'services/%s.ini' % (self.service_name)))
         # get URL
         self.server = service_params.get('config', 'url')
+        parsed_url = urlparse.urlsplit(self.server)
+        if parsed_url.scheme == 'aprs':
+            self.send_data = self.aprs_send_data
+            server, port = parsed_url.netloc.split(':')
+            self.server = (server, int(port))
+        else:
+            self.send_data = self.http_send_data
+            self.use_get = eval(service_params.get('config', 'use get'))
         # get fixed part of upload data
         self.fixed_data = dict()
         for name, value in service_params.items('fixed'):
@@ -232,92 +222,111 @@ class ToService(object):
         self.templater = Template.Template(
             self.params, self.status, self.data, self.data, None, None,
             use_locale=False)
-        self.template_file = os.path.join(
-            os.path.dirname(__file__), 'services', '%s_template_%s.txt' % (
-                config_section, self.params.get('config', 'ws type')))
+        template_name = 'services/%s_template_%s.txt' % (
+            config_section, self.params.get('config', 'ws type'))
+        if not pkg_resources.resource_exists('pywws', template_name):
+            template_name = 'services/%s_template_1080.txt' % (config_section)
+        self.template_file = pkg_resources.resource_stream(
+            'pywws', template_name)
         # get other parameters
+        self.auth_type = None
+        if service_params.has_option('config', 'auth_type'):
+            self.auth_type = service_params.get('config', 'auth_type')
+        if self.auth_type == 'basic':
+            user = self.params.get(config_section, 'user', 'unknown')
+            password = self.params.get(config_section, 'password', 'unknown')
+            self.auth = 'Basic %s' % base64.b64encode('%s:%s' % (user, password))
         self.catchup = service_params.getint('config', 'catchup')
-        self.use_get = eval(service_params.get('config', 'use get'))
-        self.use_aprs = urlparse(self.server).scheme == 'aprs'
-
-        self.min_wait = 0
-        if service_params.has_option('config', 'minwait'):
-            self.min_wait = service_params.getint('config', 'minwait')
-
         self.expected_result = eval(service_params.get('config', 'result'))
+        self.interval = service_params.getint('config', 'interval')
+        self.interval = max(self.interval, 40)
+        self.interval = timedelta(seconds=self.interval)
+        # move 'last update' from params to status
+        last_update = self.params.get_datetime(self.service_name, 'last update')
+        if last_update:
+            self.params.unset(self.service_name, 'last update')
+            self.status.set(
+                'last update', self.service_name, last_update.isoformat(' '))
+        # set timestamp of first data to upload
+        self.next_update = datetime.utcnow() - max(
+            timedelta(days=self.catchup), self.interval)
 
-    def encode_data(self, data):
-        """Encode a weather data record.
+    def prepare_data(self, data):
+        """Prepare a weather data record.
 
         The :obj:`data` parameter contains the data to be encoded. It
         should be a 'calibrated' data record, as stored in
-        :class:`pywws.DataStore.calib_store`.
+        :class:`pywws.DataStore.calib_store`. The relevant data items
+        are extracted and converted to strings using a template, then
+        merged with the station's "fixed" data.
 
         :param data: the weather data record.
 
         :type data: dict
 
-        :return: parsed template data.
+        :return: dict.
 
-        :rtype: dict
+        :rtype: string
+        
+        """
+        # check we have external data
+        if data['temp_out'] is None:
+            return None
+        # convert data
+        prepared_data = eval(self.templater.make_text(self.template_file, data))
+        self.template_file.seek(0)
+        prepared_data.update(self.fixed_data)
+        return prepared_data
+
+    def aprs_send_data(self, timestamp, prepared_data, ignore_last_update=False):
+        """Upload a weather data record using APRS.
+
+        The :obj:`prepared_data` parameter contains the data to be uploaded.
+        It should be a dictionary of string keys and string values.
+
+        :param timestamp: the timestamp of the data to upload.
+
+        :type timestamp: datetime
+
+        :param prepared_data: the data to upload.
+
+        :type prepared_data: dict
+
+        :param ignore_last_update: don't get or set the 'last update'
+            status.ini entry.
+
+        :type ignore_last_update: bool
+
+        :return: success status
+
+        :rtype: bool
 
         """
-        # check we have enough data
-        if data['temp_out'] is None or data['hum_out'] is None:
-            return None
+        result = False
 
-        # convert data
-        coded_data = eval(self.templater.make_text(self.template_file, data))
-        coded_data.update(self.fixed_data)
+        if 'APRS_PACKETS' not in prepared_data or len(prepared_data['APRS_PACKETS']) < 1:
+            return result
+        if prepared_data['ID'] == 'unknown':
+            return result
+        if prepared_data['PASSWORD'] == 'unknown':
+            prepared_data['PASSWORD'] = '-1';
 
-        if self.use_aprs:
-            if 'APRS_PACKETS' not in coded_data.keys() or len(coded_data['APRS_PACKETS']) < 1:
-                return None
-            if coded_data['ID'] == 'unknown':
-                return None
-            if coded_data['PASSWORD'] == 'unknown':
-                coded_data['PASSWORD'] = '-1';
-
-        return coded_data
-
-    def send_standard_data(self, coded_data):
-        """Perform a standard URL Request to the server with data"""
-        coded_data = urllib.urlencode(coded_data)
-        try:
-            if self.use_get:
-                wudata = urllib2.urlopen(
-                    '%s?%s' % (self.server, coded_data))
-            else:
-                wudata = urllib2.urlopen(self.server, coded_data)
-        except urllib2.HTTPError, ex:
-            if ex.code != 400:
-                raise
-            wudata = ex
-        response = wudata.readlines()
-        wudata.close()
-
-        return response
-
-    def send_aprs_data(self, coded_data):
-        """Connects to APRS server and sends data packets"""
-        result = []
-        host, port = urlparse(self.server).netloc.split(':')
         sock = socket.socket()
-        self.logger.debug('Connecting to server %s' % self.server)
+        self.logger.debug('Connecting to server %s:%d' % self.server)
         try:
-            sock.connect((host, int(port)))
-            self.logger.debug('Connected to server %s' % self.server)
+            sock.connect(self.server)
+            self.logger.debug('Connected to server %s:%d' % self.server)
         except socket.error, e:
-            self.logger.error('APRS connection to %s failed: %s' % (self.server, e))
+            self.logger.error('APRS connection to %s failed: %s' % ("%s:%d" % self.server, e))
             return result
 
         sock.sendall('user %s pass %s vers pywws %s\r\n' %
-            (coded_data['ID'], coded_data['PASSWORD'], VERSION.version))
+            (prepared_data['ID'], prepared_data['PASSWORD'], __version__))
 
         sock.recv(4096)
 
-        for command in coded_data['APRS_PACKETS']:
-            command = coded_data['ID'] + '>APRS,TCPIP*:' + command + '\r\n'
+        for command in prepared_data['APRS_PACKETS']:
+            command = prepared_data['ID'] + '>APRS,TCPIP*:' + command + '\r\n'
             self.logger.debug('Sending message %s' % command)
             try:
                 sent = sock.sendall(command)
@@ -325,7 +334,7 @@ class ToService(object):
                 self.logger.error('APRS data sending failed on packet %s: %s' % (command, e))
                 break
 
-            result = ['Success']
+            result = True
 
         try:
             sock.close()
@@ -334,138 +343,141 @@ class ToService(object):
 
         return result
 
-    def send_data(self, coded_data):
-        """Upload a weather data record.
+    def http_send_data(self, timestamp, prepared_data, ignore_last_update=False):
+        """Upload a weather data record using HTTP.
 
-        The :obj:`coded_data` parameter contains the data to be uploaded.
-        It should be a urlencoded string.
+        The :obj:`prepared_data` parameter contains the data to be uploaded.
+        It should be a dictionary of string keys and string values.
 
-        :param coded_data: the data to upload.
+        :param timestamp: the timestamp of the data to upload.
 
-        :type data: string
+        :type timestamp: datetime
+
+        :param prepared_data: the data to upload.
+
+        :type prepared_data: dict
+
+        :param ignore_last_update: don't get or set the 'last update'
+            status.ini entry.
+
+        :type ignore_last_update: bool
 
         :return: success status
 
         :rtype: bool
-
+        
         """
-
-        if self.need_to_wait():
-            return False
-
+        coded_data = urllib.urlencode(prepared_data)
         self.logger.debug(coded_data)
-
-        # have three tries before giving up
-        for n in range(3):
+        new_ex = self.old_ex
+        extra_ex = []
+        try:
             try:
-                if not self.use_aprs:
-                    response = self.send_standard_data(coded_data)
+                if self.use_get:
+                    request = urllib2.Request('%s?%s' % (self.server, coded_data))
                 else:
-                    response = self.send_aprs_data(coded_data)
-
-                if len(response) == len(self.expected_result):
-                    for actual, expected in zip(response, self.expected_result):
-                        if not re.match(expected, actual):
-                            break
-                    else:
-                        self.old_response = response
-                        return True
-                if response != self.old_response:
-                    for line in response:
-                        self.logger.error(line.strip())
-                self.old_response = response
-            except Exception, ex:
-                e = str(ex)
-                if e != self.old_ex:
-                    self.logger.error(e)
-                    self.old_ex = e
+                    request = urllib2.Request(self.server, coded_data)
+                if self.auth_type == 'basic':
+                    request.add_header('Authorization', self.auth)
+                wudata = urllib2.urlopen(request)
+            except urllib2.HTTPError, ex:
+                if ex.code != 400:
+                    raise
+                wudata = ex
+            response = wudata.readlines()
+            wudata.close()
+            if len(response) == len(self.expected_result):
+                for actual, expected in zip(response, self.expected_result):
+                    if not re.match(expected, actual):
+                        break
+                else:
+                    self.old_response = response
+                    if not ignore_last_update:
+                        self.set_last_update(timestamp)
+                    return True
+            if response != self.old_response:
+                for line in response:
+                    self.logger.error(line.strip())
+            self.old_response = response
+        except urllib2.HTTPError, ex:
+            new_ex = str(ex)
+            extra_ex = str(ex.info()).split('\n')
+            for line in ex.readlines():
+                extra_ex.append(re.sub('<.+?>', '', line))
+        except Exception, ex:
+            new_ex = str(ex)
+        if new_ex == self.old_ex:
+            log = self.logger.debug
+        else:
+            log = self.logger.error
+            self.old_ex = new_ex
+        log(new_ex)
+        for extra in extra_ex:
+            extra = extra.strip()
+            if extra:
+                log(extra)
         return False
 
-    def next_data(self, start, live_data):
+    def next_data(self, catchup, live_data, ignore_last_update=False):
         """Get weather data records to upload.
 
         This method returns either the most recent weather data
-        record, or all records since a given datetime, according to
-        the value of :obj:`start`.
+        record, or all records since the last upload, according to
+        the value of :obj:`catchup`.
 
-        :param start: datetime of first record to get, or None to get
-         most recent data only.
+        :param catchup: ``True`` to get all records since last upload,
+         or ``False`` to get most recent data only.
 
-        :type start: datetime
+        :type catchup: boolean
 
-        :param live_data: a current 'live' data record, or None.
+        :param live_data: a current 'live' data record, or ``None``.
 
         :type live_data: dict
+
+        :param ignore_last_update: don't get the 'last update'
+            status.ini entry.
+
+        :type ignore_last_update: bool
 
         :return: yields weather data records.
 
         :rtype: dict
         
         """
-        if not start:
-            if live_data:
-                start = datetime.max
-            else:
-                start = self.data.before(datetime.max)
+        if ignore_last_update:
+            last_update = None
+        else:
+            last_update = self.status.get_datetime(
+                'last update', self.service_name)
+        if last_update:
+            self.next_update = max(self.next_update,
+                                   last_update + self.interval)
+        if catchup:
+            start = self.next_update
+        else:
+            start = self.data.before(datetime.max)
         if live_data:
-            stop = live_data['idx'] - FIFTY_SECS
+            stop = live_data['idx'] - self.interval
         else:
             stop = None
         for data in self.data[start:stop]:
-            yield data
-        if live_data:
+            if data['idx'] >= self.next_update:
+                self.next_update = data['idx'] + self.interval
+                yield data
+        if live_data and live_data['idx'] >= self.next_update:
+            self.next_update = live_data['idx'] + self.interval
             yield live_data
 
-    def set_status(self, timestamp):
+    def set_last_update(self, timestamp):
         self.status.set(
             'last update', self.service_name, timestamp.isoformat(' '))
         if self.parent:
             last_update = self.status.get_datetime('last update', self.parent)
-            if last_update and last_update >= timestamp - FIVE_MINS:
-                self.status.set(
-                    'last update', self.parent, timestamp.isoformat(' '))
+            if last_update and last_update >= timestamp - PARENT_MARGIN:
+                self.status.set('last update', self.parent,
+                                (timestamp + PARENT_MARGIN).isoformat(' '))
 
-    def get_status(self):
-        last_update = self.params.get_datetime(self.service_name, 'last update')
-        if last_update:
-            self.params.unset(self.service_name, 'last update')
-            self.set_status(last_update)
-
-        last_update = self.status.get_datetime('last update', self.service_name)
-
-        if self.parent:
-            last_parent = self.status.get_datetime('last update', self.parent)
-            last_update = max(last_update, last_parent) if last_update else last_parent
-
-        return last_update
-
-    def need_to_wait(self):
-        last_update = self.get_status()
-        if not last_update:
-            return False
-        waited = (datetime.utcnow() - last_update).total_seconds()
-        if waited < self.min_wait:
-            self.logger.debug('Not allowed to upload yet, need to wait %ds'
-                % (self.min_wait - waited))
-            return True
-        return False
-
-    def catchup_start(self):
-        """Get datetime of first 'catchup' record to send.
-
-        :rtype: datetime
-
-        """
-        if self.catchup <= 0:
-            return None
-        start = datetime.utcnow() - timedelta(days=self.catchup)
-
-        last_update = self.get_status()
-        if last_update:
-            start = max(start, last_update + FIFTY_SECS)
-        return start
-
-    def Upload(self, catchup=True, live_data=None):
+    def Upload(self, catchup=True, live_data=None, ignore_last_update=False):
         """Upload one or more weather data records.
 
         This method uploads either the most recent weather data
@@ -479,23 +491,28 @@ class ToService(object):
 
         :type catchup: bool
 
+        :param live_data: current 'live' data. If not present the most
+            recent logged data is uploaded.
+
+        :type live_data: dict
+
+        :param ignore_last_update: don't get or set the 'last update'
+            status.ini entry.
+
+        :type ignore_last_update: bool
+
         :return: success status
 
         :rtype: bool
-
+        
         """
-        if catchup:
-            start = self.catchup_start()
-        else:
-            start = None
         count = 0
-        for data in self.next_data(start, live_data):
-            coded_data = self.encode_data(data)
-            if not coded_data:
+        for data in self.next_data(catchup, live_data, ignore_last_update):
+            prepared_data = self.prepare_data(data)
+            if not prepared_data:
                 continue
-            if not self.send_data(coded_data):
+            if not self.send_data(data['idx'], prepared_data, ignore_last_update):
                 return False
-            self.set_status(data['idx'])
             count += 1
         if count > 1:
             self.logger.info('%d records sent', count)
@@ -530,7 +547,8 @@ def main(argv=None):
     logger = ApplicationLogger(verbose)
     return ToService(
         DataStore.params(args[0]), DataStore.status(args[0]),
-        DataStore.calib_store(args[0]), args[1]).Upload(catchup=catchup)
+        DataStore.calib_store(args[0]), args[1]).Upload(
+            catchup=catchup, ignore_last_update=not catchup)
 
 if __name__ == "__main__":
     sys.exit(main())

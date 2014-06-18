@@ -16,13 +16,37 @@
 #! along with this program; if not, write to the Free Software                     #
 #! Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. #
 #live#
-#roundtime True#
-{
-#idx          "'datum'                   : '%Y%m%d%H%M',"#
-#hum_out      "'feuchtigkeit'            : '%.d',"#
-#temp_out     "'temperatur'              : '%.1f',"#
-#wind_dir     "'windrichtung'            : '%.0f'," "" "winddir_degrees(x)"#
-#wind_ave     "'windstaerke'             : '%.1f',"#
-#rel_pressure "'luftdruck'               : '%.1f',"#
-#calc "rain_hour(data)" "'niederschlagsmenge' : '%.1f',"#
-}
+<response>
+  <current_weather>
+    <temperature unit="c">
+#temp_out "      <current value=\"%.1f\"/>"#
+
+#calc "apparent_temp(data['temp_out'], data['hum_out'], data['wind_ave'])" "      <feels_like value=\"%.1f\"/>"#
+
+    </temperature>
+#hum_out "    <humidity value=\"%d\"/>"#
+
+    <pressure #rel_pressure "value=\"%.1f\""# #calc "hour_diff(data,'rel_pressure')" "trend=\"%.1f\""# unit="hPa"/>
+    <wind>
+#wind_ave "      <speed value=\"%.1f\" unit=\"m/s\"/>"#
+
+#wind_dir "      <direction value=\"%.0f\"/>" "" "winddir_degrees(x)"#
+
+#wind_gust "      <gusts value=\"%.1f\" unit=\"m/s\"/>"#
+
+    </wind>
+    <sky>
+      <precipitation>
+        <rain>
+#calc "rain_hour(data)" "          <rate value=\"%.1f\" unit=\"mm\"/>"#
+
+#calc "rain_day(data)" "          <daily_total value=\"%.1f\" unit=\"mm\"/>"#
+
+        </rain>
+      </precipitation>
+    </sky>
+    <auto_update>
+      <interval value="48"/>
+    </auto_update>
+  </current_weather>
+</response>

@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -31,6 +31,8 @@ detailed instructions.
 
 """
 
+from __future__ import absolute_import
+
 __docformat__ = "restructuredtext en"
 __usage__ = """
  usage: python -m pywws.ToTwitter [options] data_dir file
@@ -54,10 +56,43 @@ try:
 except ImportError:
     import tweepy
 
-from pywws.constants import Twitter as pct
-from pywws import DataStore
-from pywws import Localisation
-from pywws.Logger import ApplicationLogger
+from .constants import Twitter as pct
+from . import DataStore
+from . import Localisation
+from .Logger import ApplicationLogger
+
+class TweepyHandler(object):
+    def __init__(self, key, secret, latitude, longitude):
+        auth = tweepy.OAuthHandler(pct.consumer_key, pct.consumer_secret)
+        auth.set_access_token(key, secret)
+        self.api = tweepy.API(auth)
+        if latitude is not None and longitude is not None:
+            self.kwargs = {'lat' : latitude, 'long' : longitude}
+        else:
+            self.kwargs = {}
+
+    def post(self, status, media):
+        if media:
+            self.api.update_with_media(media, status[:117], **self.kwargs)
+        else:
+            self.api.update_status(status[:140], **self.kwargs)
+
+class PythonTwitterHandler(object):
+    def __init__(self, key, secret, latitude, longitude):
+        self.api = twitter.Api(
+            consumer_key=pct.consumer_key,
+            consumer_secret=pct.consumer_secret,
+            access_token_key=key, access_token_secret=secret)
+        if latitude is not None and longitude is not None:
+            self.kwargs = {'latitude' : latitude, 'longitude' : longitude}
+        else:
+            self.kwargs = {}
+
+    def post(self, status, media):
+        if media:
+            self.api.PostMedia(status[:117], media, **self.kwargs)
+        else:
+            self.api.PostUpdate(status[:140], **self.kwargs)
 
 class ToTwitter(object):
     def __init__(self, params):
@@ -82,40 +117,35 @@ class ToTwitter(object):
 
         # open API
         if twitter:
-            self.api = twitter.Api(
-                consumer_key=pct.consumer_key,
-                consumer_secret=pct.consumer_secret,
-                access_token_key=key, access_token_secret=secret)
-            self.post = self.api.PostUpdate
-            self.post_kw = {'latitude' : latitude, 'longitude' : longitude}
+            self.api = PythonTwitterHandler(key, secret, latitude, longitude)
         else:
-            auth = tweepy.OAuthHandler(pct.consumer_key, pct.consumer_secret)
-            auth.set_access_token(key, secret)
-            self.api = tweepy.API(auth)
-            self.post = self.api.update_status
-            self.post_kw = {'lat' : latitude, 'long' : longitude}
+            self.api = TweepyHandler(key, secret, latitude, longitude)
 
     def Upload(self, tweet):
         if not tweet:
             return True
+        if tweet.startswith('media'):
+            media, tweet = tweet.split('\n', 1)
+            media = media.split()[1]
+        else:
+            media = None
         if not isinstance(tweet, unicode):
             tweet = tweet.decode(self.encoding)
-        for i in range(3):
-            try:
-                status = self.post(tweet, **self.post_kw)
+        try:
+            self.api.post(tweet, media)
+            return True
+        except Exception, ex:
+            e = str(ex)
+            if 'is a duplicate' in e:
                 return True
-            except Exception, ex:
-                e = str(ex)
-                if 'is a duplicate' in e:
-                    return True
-                if e != self.old_ex:
-                    self.logger.error(e)
-                    self.old_ex = e
+            if e != self.old_ex:
+                self.logger.error(e)
+                self.old_ex = e
         return False
 
     def UploadFile(self, file):
         tweet_file = codecs.open(file, 'r', encoding=self.encoding)
-        tweet = tweet_file.read(140)
+        tweet = tweet_file.read()
         tweet_file.close()
         return self.Upload(tweet)
 

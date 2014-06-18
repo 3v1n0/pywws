@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -62,6 +62,8 @@ Detailed API
 
 """
 
+from __future__ import absolute_import
+
 __docformat__ = "restructuredtext en"
 __usage__ = """
  usage: python -m pywws.Upload [options] data_dir file [file...]
@@ -82,11 +84,11 @@ import os
 import shutil
 import sys
 
-from pywws import DataStore
-from pywws.Logger import ApplicationLogger
+from . import DataStore
+from .Logger import ApplicationLogger
 
 class _ftp(object):
-    def __init__(self, logger, site, user, password, directory):
+    def __init__(self, logger, site, user, password, directory, port):
         global ftplib
         import ftplib
         self.logger = logger
@@ -94,10 +96,13 @@ class _ftp(object):
         self.user = user
         self.password = password
         self.directory = directory
+        self.port = port
 
     def connect(self):
         self.logger.info("Uploading to web site with FTP")
-        self.ftp = ftplib.FTP(self.site, self.user, self.password)
+        self.ftp = ftplib.FTP()
+        self.ftp.connect(self.site, self.port)
+        self.ftp.login(self.user, self.password)
         self.logger.debug(self.ftp.getwelcome())
         self.ftp.cwd(self.directory)
 
@@ -117,7 +122,7 @@ class _ftp(object):
         self.ftp.close()
 
 class _sftp(object):
-    def __init__(self, logger, site, user, password, directory):
+    def __init__(self, logger, site, user, password, directory, port):
         global paramiko
         import paramiko
         self.logger = logger
@@ -125,10 +130,11 @@ class _sftp(object):
         self.user = user
         self.password = password
         self.directory = directory
+        self.port = port
 
     def connect(self):
         self.logger.info("Uploading to web site with SFTP")
-        self.transport = paramiko.Transport((self.site, 22))
+        self.transport = paramiko.Transport((self.site, self.port))
         self.transport.connect(username=self.user, password=self.password)
         self.ftp = paramiko.SFTPClient.from_transport(self.transport)
         self.ftp.chdir(self.directory)
@@ -160,6 +166,7 @@ class Upload(object):
     def __init__(self, params):
         self.logger = logging.getLogger('pywws.Upload')
         self.params = params
+        self.old_ex = None
         if eval(self.params.get('ftp', 'local site', 'False')):
             # copy to local directory
             directory = self.params.get(
@@ -174,29 +181,39 @@ class Upload(object):
             directory = self.params.get(
                 'ftp', 'directory', 'public_html/weather/data/')
             if eval(self.params.get('ftp', 'secure', 'False')):
+                port = eval(self.params.get('ftp', 'port', '22'))
                 self.uploader = _sftp(
-                    self.logger, site, user, password, directory)
+                    self.logger, site, user, password, directory, port)
             else:
+                port = eval(self.params.get('ftp', 'port', '21'))
                 self.uploader = _ftp(
-                    self.logger, site, user, password, directory)
+                    self.logger, site, user, password, directory, port)
 
     def connect(self):
         try:
             self.uploader.connect()
         except Exception, ex:
-            self.logger.error(str(ex))
+            e = str(ex)
+            if e == self.old_ex:
+                self.logger.debug(e)
+            else:
+                self.logger.error(e)
+                self.old_ex = e
             return False
         return True
 
     def upload_file(self, file):
         target = os.path.basename(file)
-        # have three tries before giving up
-        for n in range(3):
-            try:
-                self.uploader.put(file, target)
-                return True
-            except Exception, ex:
-                self.logger.error(str(ex))
+        try:
+            self.uploader.put(file, target)
+            return True
+        except Exception, ex:
+            e = str(ex)
+            if e == self.old_ex:
+                self.logger.debug(e)
+            else:
+                self.logger.error(e)
+                self.old_ex = e
         return False
 
     def disconnect(self):

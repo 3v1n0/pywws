@@ -1,6 +1,6 @@
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -68,11 +68,14 @@ Detailed API
 
 """
 
+from __future__ import with_statement
+
 from ConfigParser import RawConfigParser
 import csv
 from datetime import date, datetime, timedelta, MAXYEAR
 import os
 import sys
+from threading import Lock
 import time
 
 DAY = timedelta(days=1)
@@ -91,13 +94,15 @@ def safestrptime(date_string, format=None):
 
 class ParamStore(object):
     def __init__(self, root_dir, file_name):
-        if not os.path.isdir(root_dir):
-            os.makedirs(root_dir)
-        self._path = os.path.join(root_dir, file_name)
-        self._dirty = False
-        # open config file
-        self._config = RawConfigParser()
-        self._config.read(self._path)
+        self._lock = Lock()
+        with self._lock:
+            if not os.path.isdir(root_dir):
+                os.makedirs(root_dir)
+            self._path = os.path.join(root_dir, file_name)
+            self._dirty = False
+            # open config file
+            self._config = RawConfigParser()
+            self._config.read(self._path)
 
     def __del__(self):
         self.flush()
@@ -105,10 +110,14 @@ class ParamStore(object):
     def flush(self):
         if not self._dirty:
             return
-        self._dirty = False
-        of = open(self._path, 'w')
-        self._config.write(of)
-        of.close()
+        with self._lock:
+            self._dirty = False
+            of = open(self._path, 'w')
+            self._config.write(of)
+            of.close()
+
+    def has_option(self, section, option):
+        return self._config.has_option(section, option)
 
     def get(self, section, option, default=None):
         """Get a parameter value and return a string.
@@ -118,11 +127,12 @@ class ParamStore(object):
         then the return value.
 
         """
-        if not self._config.has_option(section, option):
-            if default is not None:
-                self.set(section, option, default)
-            return default
-        return self._config.get(section, option)
+        with self._lock:
+            if not self._config.has_option(section, option):
+                if default is not None:
+                    self._set(section, option, default)
+                return default
+            return self._config.get(section, option)
 
     def get_datetime(self, section, option, default=None):
         result = self.get(section, option, default)
@@ -132,6 +142,10 @@ class ParamStore(object):
 
     def set(self, section, option, value):
         """Set option in section to string value."""
+        with self._lock:
+            self._set(section, option, value)
+
+    def _set(self, section, option, value):
         if not self._config.has_section(section):
             self._config.add_section(section)
         elif (self._config.has_option(section, option) and
@@ -142,14 +156,15 @@ class ParamStore(object):
 
     def unset(self, section, option):
         """Remove option from section."""
-        if not self._config.has_section(section):
-            return
-        if self._config.has_option(section, option):
-            self._config.remove_option(section, option)
-            self._dirty = True
-        if not self._config.options(section):
-            self._config.remove_section(section)
-            self._dirty = True
+        with self._lock:
+            if not self._config.has_section(section):
+                return
+            if self._config.has_option(section, option):
+                self._config.remove_option(section, option)
+                self._dirty = True
+            if not self._config.options(section):
+                self._config.remove_section(section)
+                self._dirty = True
 
 class params(ParamStore):
     def __init__(self, root_dir):
@@ -469,7 +484,10 @@ class core_store(object):
         for data in cache.data:
             row = []
             for key in self.key_list[0:len(data)]:
-                row.append(data[key])
+                if isinstance(data[key], float):
+                    row.append(str(data[key]))
+                else:
+                    row.append(data[key])
             writer.writerow(row)
         csvfile.close()
 
@@ -531,7 +549,7 @@ class calib_store(core_store):
         'rel_pressure' : float,
         'wind_ave'     : float,
         'wind_gust'    : float,
-        'wind_dir'     : int,
+        'wind_dir'     : float,
         'rain'         : float,
         'status'       : int,
         'illuminance'  : float,
@@ -559,7 +577,7 @@ class hourly_store(core_store):
         'pressure_trend'    : float,
         'wind_ave'          : float,
         'wind_gust'         : float,
-        'wind_dir'          : int,
+        'wind_dir'          : float,
         'rain'              : float,
         'illuminance'       : float,
         'uv'                : int,
@@ -627,7 +645,7 @@ class daily_store(core_store):
         'wind_ave'           : float,
         'wind_gust'          : float,
         'wind_gust_t'        : safestrptime,
-        'wind_dir'           : int,
+        'wind_dir'           : float,
         'rain'               : float,
         'illuminance_ave'    : float,
         'illuminance_max'    : float,
@@ -735,7 +753,7 @@ class monthly_store(core_store):
         'wind_ave'             : float,
         'wind_gust'            : float,
         'wind_gust_t'          : safestrptime,
-        'wind_dir'             : int,
+        'wind_dir'             : float,
         'rain'                 : float,
         'rain_days'            : int,
         'illuminance_ave'      : float,

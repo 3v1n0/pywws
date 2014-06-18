@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,8 +16,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from pywws.Hourly import main
-sys.exit(main())
+class Calib(object):
+    """Minimum weather station calibration class."""
+    def __init__(self, params, raw_data):
+        self.pressure_offset = eval(params.get('config', 'pressure offset'))
+
+    def calib(self, raw):
+        result = dict(raw)
+        # calculate relative pressure
+        result['rel_pressure'] = result['abs_pressure'] + self.pressure_offset
+        return result

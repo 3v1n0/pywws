@@ -1,6 +1,6 @@
 .. pywws - Python software for USB Wireless Weather Stations
    http://github.com/jim-easterbrook/pywws
-   Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+   Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -19,19 +19,36 @@
 Python programs and modules
 ===========================
 
-Contents:
+Set up and configure pywws
+--------------------------
+
+.. autosummary::
+   :toctree: api
+
+   pywws.TestWeatherStation
+   pywws.SetWeatherStation
+   pywws.version
+   pywws.Reprocess
+   pywws.TwitterAuth
+   pywws.USBQualityTest
+   pywws.EWtoPy
+
+Get data and process it
+-----------------------
 
 .. autosummary::
    :toctree: api
 
    pywws.Hourly
    pywws.LiveLog
-   pywws.Reprocess
-   pywws.TwitterAuth
-   pywws.SetWeatherStation
-   pywws.TestWeatherStation
-   pywws.USBQualityTest
-   pywws.EWtoPy
+   pywws.livelogdaemon
+
+"Internal" modules
+------------------
+
+.. autosummary::
+   :toctree: api
+
    pywws.Tasks
    pywws.LogData
    pywws.Process
@@ -46,13 +63,13 @@ Contents:
    pywws.toservice
    pywws.YoWindow
    pywws.WeatherStation
-   pywws.device_ctypes_hidapi
-   pywws.device_cython_hidapi
    pywws.device_pyusb1
    pywws.device_pyusb
+   pywws.device_ctypes_hidapi
+   pywws.device_cython_hidapi
    pywws.DataStore
    pywws.TimeZone
    pywws.Localisation
-   pywws.calib
    pywws.conversions
    pywws.Logger
+   pywws.constants

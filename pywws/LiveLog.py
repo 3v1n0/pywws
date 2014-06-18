@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-13  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,26 +20,26 @@
 
 """Get weather data, store it, and process it.
 
-Run this continuously, having set what tasks are to be done. ::
-
+Run this continuously, having set what tasks are to be done. This
+script can also be run with the ``pywws-livelog`` command. ::
 %s
-
 For more information on using ``LiveLog.py``, see
 :doc:`../guides/livelogging`.
 
 """
 
+from __future__ import absolute_import
+
 __docformat__ = "restructuredtext en"
 __usage__ = """
- usage: python -m pywws.LiveLog [options] data_dir
+ usage: %s [options] data_dir
  options are:
   -h      or --help      display this help
   -l file or --log file  write log information to file
   -v      or --verbose   increase amount of reassuring messages
- data_dir is the root directory of the weather data (e.g. /data/weather)
+ data_dir is the root directory of the weather data (e.g. ~/weather/data)
 """
-__doc__ %= __usage__
-__usage__ = __doc__.split('\n')[0] + __usage__
+__doc__ %= __usage__ % ('python -m pywws.LiveLog')
 
 from datetime import datetime, timedelta
 import getopt
@@ -48,12 +48,12 @@ import os
 import sys
 import time
 
-from pywws import DataStore
-from pywws import Localisation
-from pywws.LogData import DataLogger
-from pywws.Logger import ApplicationLogger
-from pywws import Process
-from pywws import Tasks
+from . import DataStore
+from . import Localisation
+from .LogData import DataLogger
+from .Logger import ApplicationLogger
+from . import Process
+from . import Tasks
 
 def LiveLog(data_dir):
     logger = logging.getLogger('pywws.LiveLog')
@@ -95,18 +95,20 @@ def LiveLog(data_dir):
 def main(argv=None):
     if argv is None:
         argv = sys.argv
+    usage = (__usage__ % (argv[0])).strip()
     try:
         opts, args = getopt.getopt(argv[1:], "hl:v", ['help', 'log=', 'verbose'])
     except getopt.error, msg:
         print >>sys.stderr, 'Error: %s\n' % msg
-        print >>sys.stderr, __usage__.strip()
+        print >>sys.stderr, usage
         return 1
     # process options
     logfile = None
     verbose = 0
     for o, a in opts:
         if o in ('-h', '--help'):
-            print __usage__.strip()
+            print __doc__.split('\n\n')[0]
+            print usage
             return 0
         elif o in ('-l', '--log'):
             logfile = a
@@ -115,7 +117,7 @@ def main(argv=None):
     # check arguments
     if len(args) != 1:
         print >>sys.stderr, 'Error: 1 argument required\n'
-        print >>sys.stderr, __usage__.strip()
+        print >>sys.stderr, usage
         return 2
     logger = ApplicationLogger(verbose, logfile)
     return LiveLog(args[0])
