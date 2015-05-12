@@ -388,49 +388,47 @@ class ToService(object):
         sock = socket.socket()
         self.logger.debug('Connecting to server %s:%d' % self.server)
         try:
-            sock.connect(self.server)
-            response = sock.recv(4096)
-            self.logger.debug('Connected to server %s, running software: %s' %
-                ("%s:%d" % self.server, response.strip()))
-        except socket.error, e:
-            self.logger.error('APRS connection to %s failed: %s' %
-                ("%s:%d" % self.server, e))
-            sock.close()
-            return result
-
-        login = 'user %s pass %s vers pywws %s\r\n' %
-            (prepared_data['ID'], prepared_data['PASSWORD'], __version__)
-
-        try:
-            sock.sendall(login.encode('ASCII'))
-            response = sock.recv(4096)
-            self.logger.debug('server login ack: %s', response.strip())
-        except socket.error, e:
-            self.logger.error('APRS login failed: %s' % e)
-            sock.close()
-            return result
-
-        for command in prepared_data['APRS_PACKETS']:
-            command = (prepared_data['ID'] + '>APRS,TCPIP*:' + command + '\r\n').encode('ASCII')
-            self.logger.debug('Sending message %s' % command)
             try:
-                sock.sendall(command)
+                sock.connect(self.server)
+                response = sock.recv(4096)
+                self.logger.debug('Connected to server %s, running software: %s' %
+                    ("%s:%d" % self.server, response.strip()))
             except socket.error, e:
-                result = False
-                self.logger.error('APRS data sending failed on packet %s: %s' % (command, e))
-                break
+                self.logger.error('APRS connection to %s failed: %s' %
+                    ("%s:%d" % self.server, e))
+                return result
+
+            login = 'user %s pass %s vers pywws %s\r\n' %
+                (prepared_data['ID'], prepared_data['PASSWORD'], __version__)
+
+            try:
+                sock.sendall(login.encode('ASCII'))
+                response = sock.recv(4096)
+                self.logger.debug('server login ack: %s', response.strip())
+            except socket.error, e:
+                self.logger.error('APRS login failed: %s' % e)
+                return result
+
+            for command in prepared_data['APRS_PACKETS']:
+                command = (prepared_data['ID'] + '>APRS,TCPIP*:' + command + '\r\n').encode('ASCII')
+                self.logger.debug('Sending message %s' % command)
+                try:
+                    sock.sendall(command)
+                except socket.error, e:
+                    self.logger.error('APRS data sending failed on packet %s: %s' % (command, e))
+                    return result
 
             result = True
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except:
+                pass
 
-        try:
-            sock.shutdown(socket.SHUT_RDWR)
-        except:
-            pass
-
-        try:
-            sock.close()
-        except:
-            pass
+        finally:
+            try:
+                sock.close()
+            except:
+                pass
 
         if result and not ignore_last_update:
             self.set_last_update(timestamp)
