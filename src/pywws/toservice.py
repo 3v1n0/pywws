@@ -398,7 +398,7 @@ class ToService(object):
                     ("%s:%d" % self.server, e))
                 return result
 
-            login = 'user %s pass %s vers pywws %s\r\n' %
+            login = 'user %s pass %s vers pywws %s\r\n' % \
                 (prepared_data['ID'], prepared_data['PASSWORD'], __version__)
 
             try:
