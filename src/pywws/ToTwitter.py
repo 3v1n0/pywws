@@ -120,9 +120,9 @@ class ToTwitter(object):
         longitude = params.get('config', 'longitude')
 
         # added for backward compatibility and overriding
-        if not latitude:
+        if params.has_option('twitter', 'latitude'):
             latitude = params.get('twitter', 'latitude')
-        if not self.long:
+        if params.has_option('twitter', 'longitude'):
             longitude = params.get('twitter', 'longitude')
 
         # open API
