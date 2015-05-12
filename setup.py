@@ -18,36 +18,64 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+from __future__ import with_statement
+
 from datetime import date
-from distutils import log
+from distutils.command.upload import upload
 import os
 from setuptools import setup
-import subprocess
+import sys
 
 # read current version info without importing pywws package
-with open('pywws/__init__.py') as f:
-    exec(f.read())
+if sys.version_info[0] >= 3:
+    with open('src/pywws/__init__.py') as f:
+        exec(f.read())
+else:
+    execfile('src/pywws/__init__.py')
+
+# get GitHub repo information
+# requires GitPython - 'sudo pip install gitpython --pre'
+last_commit = _commit
+last_release = None
+try:
+    import git
+    try:
+        repo = git.Repo()
+        latest = 0
+        for tag in repo.tags:
+            if tag.tag.tagged_date > latest:
+                latest = tag.tag.tagged_date
+                last_release = str(tag)
+        last_commit = str(repo.head.commit)[:7]
+    except git.exc.InvalidGitRepositoryError:
+        pass
+except ImportError:
+    pass
 
 # regenerate version info, if required
-regenerate = False
-try:
-    p = subprocess.Popen(['git', 'rev-parse', '--short', 'HEAD'],
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    commit = p.communicate()[0].strip().decode('ASCII')
-    regenerate = (not p.returncode) and commit != _commit
-except OSError:
-    pass
-if regenerate:
-    release = str(int(_release) + 1)
-    version = date.today().strftime('%y.%m') + '.dev%s' % release
-    vf = open('pywws/__init__.py', 'w')
+if last_commit != _commit:
+    _release = str(int(_release) + 1)
+    _commit = last_commit
+if last_release:
+    major, minor, patch = last_release.split('.')
+    today = date.today()
+    if today.strftime('%m') == minor:
+        patch = int(patch) + 1
+    else:
+        patch = 0
+    next_release = today.strftime('%y.%m') + '.%d' % patch
+    version = next_release + '.dev%s' % _release
+else:
+    next_release = '.'.join(__version__.split('.')[:3])
+    version = next_release
+
+if version != __version__:
+    vf = open('src/pywws/__init__.py', 'w')
     vf.write("""__version__ = '%s'
 _release = '%s'
 _commit = '%s'
-""" % (version, release, commit))
+""" % (version, _release, _commit))
     vf.close()
-else:
-    version = __version__
 
 cmdclass = {}
 command_options = {}
@@ -61,11 +89,11 @@ else:
 # requires Babel to be installed
 command_options['compile_catalog'] = {
     'domain'    : ('setup.py', 'pywws'),
-    'directory' : ('setup.py', 'pywws/lang'),
+    'directory' : ('setup.py', 'src/pywws/lang'),
     'use_fuzzy' : ('setup.py', '1'),
     }
 command_options['extract_messages'] = {
-    'input_dirs'         : ('setup.py', 'pywws'),
+    'input_dirs'         : ('setup.py', 'src/pywws'),
     'output_file'        : ('setup.py', 'build/gettext/pywws.pot'),
     'no_wrap'            : ('setup.py', '1'),
     'sort_by_file'       : ('setup.py', '1'),
@@ -77,13 +105,13 @@ command_options['extract_messages'] = {
 command_options['init_catalog'] = {
     'domain'     : ('setup.py', 'pywws'),
     'input_file' : ('setup.py', 'build/gettext/pywws.pot'),
-    'output_dir' : ('setup.py', 'pywws/lang'),
+    'output_dir' : ('setup.py', 'src/pywws/lang'),
     'no_wrap'    : ('setup.py', '1'),
     }
 command_options['update_catalog'] = {
     'domain'     : ('setup.py', 'pywws'),
     'input_file' : ('setup.py', 'build/gettext/pywws.pot'),
-    'output_dir' : ('setup.py', 'pywws/lang'),
+    'output_dir' : ('setup.py', 'src/pywws/lang'),
     'no_wrap'    : ('setup.py', '1'),
     }
 
@@ -93,8 +121,8 @@ try:
     # compile documentation to html
     cmdclass['build_sphinx'] = BuildDoc
     command_options['build_sphinx'] = {
-        'source_dir' : ('setup.py', 'doc_src'),
-        'build_dir'  : ('setup.py', 'pywws/doc/%s' % (lang)),
+        'source_dir' : ('setup.py', 'src/doc'),
+        'build_dir'  : ('setup.py', 'doc/%s' % (lang)),
         'builder'    : ('setup.py', 'html'),
         }
     # extract strings for translation
@@ -102,7 +130,7 @@ try:
         description = 'extract localizable strings from the documentation'
     cmdclass['extract_messages_doc'] = extract_messages_doc
     command_options['extract_messages_doc'] = {
-        'source_dir' : ('setup.py', 'doc_src'),
+        'source_dir' : ('setup.py', 'src/doc'),
         'build_dir'  : ('setup.py', 'build'),
         'builder'    : ('setup.py', 'gettext'),
         }
@@ -111,8 +139,29 @@ except ImportError:
 
 # set options for uploading documentation to PyPI
 command_options['upload_docs'] = {
-    'upload_dir' : ('setup.py', 'pywws/doc'),
+    'upload_dir' : ('setup.py', 'doc'),
     }
+
+# modify upload class to add appropriate tag
+# requires GitPython - 'sudo pip install gitpython --pre'
+class upload_and_tag(upload):
+    def run(self):
+        import git
+        message = ''
+        with open('CHANGELOG.txt') as cl:
+            while not cl.readline().startswith('Changes'):
+                pass
+            while True:
+                line = cl.readline().strip()
+                if not line:
+                    break
+                message += line + '\n'
+        repo = git.Repo()
+        tag = repo.create_tag(next_release, message=message)
+        remote = repo.remotes.origin
+        remote.push(tags=True)
+        return upload.run(self)
+cmdclass['upload'] = upload_and_tag
 
 # set options for building distributions
 command_options['sdist'] = {
@@ -123,12 +172,12 @@ with open('README.rst') as ldf:
     long_description = ldf.read()
 
 setup(name = 'pywws',
-      version = version,
+      version = next_release,
       description = 'Python software for wireless weather stations',
       author = 'Jim Easterbrook',
       author_email = 'jim@jim-easterbrook.me.uk',
       url = 'http://jim-easterbrook.github.com/pywws/',
-      download_url = 'https://pypi.python.org/pypi/pywws/%s' % version,
+      download_url = 'https://pypi.python.org/pypi/pywws/%s' % next_release,
       long_description = long_description,
       classifiers = [
           'Development Status :: 5 - Production/Stable',
@@ -142,11 +191,11 @@ setup(name = 'pywws',
       license = 'GNU GPL',
       platforms = ['POSIX', 'MacOS', 'Windows'],
       packages = ['pywws'],
+      package_dir = {'' : 'src'},
       package_data = {
           'pywws' : [
               'services/*',
               'lang/*/LC_MESSAGES/pywws.mo',
-              'doc/*.*', 'doc/*/html/*.*', 'doc/*/html/*/*.*', 'doc/*/html/*/*/*',
               'examples/*/*.*', 'examples/*/*/*.*',
               ],
           },
@@ -163,6 +212,7 @@ setup(name = 'pywws',
               'pywws-version            = pywws.version:main',
               ],
           },
+      install_requires = ['tzlocal'],
       extras_require = {
           'daemon'  : ['python-daemon'],
           'sftp'    : ['paramiko', 'pycrypto'],
