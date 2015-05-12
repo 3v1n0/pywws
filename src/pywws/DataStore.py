@@ -117,7 +117,8 @@ class ParamStore(object):
             of.close()
 
     def has_option(self, section, option):
-        return self._config.has_option(section, option)
+        with self._lock:
+            return self._config.has_option(section, option)
 
     def get(self, section, option, default=None):
         """Get a parameter value and return a string.
