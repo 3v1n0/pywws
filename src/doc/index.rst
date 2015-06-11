@@ -1,6 +1,6 @@
 .. pywws - Python software for USB Wireless Weather Stations
    http://github.com/jim-easterbrook/pywws
-   Copyright (C) 2008-14  Jim Easterbrook  jim@jim-easterbrook.me.uk
+   Copyright (C) 2008-15  pywws contributors
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -22,9 +22,9 @@
 .. include:: ../../README.rst
 
 Documentation is available in the following languages (non-English versions may not be complete or up to date):
-   * `English <../../en/html/index.html>`_
-   * `Français <../../fr/html/index.html>`_ -- translated by Jacques Desroches
-   * `Italiano <../../it/html/index.html>`_ -- translated by Edoardo
+   * `English <../../en/>`_
+   * `Français <../../fr/>`_ -- translated by Jacques Desroches
+   * `Italiano <../../it/>`_ -- translated by Edoardo
 
 I have written this software to meet my needs, but have tried to make it adaptable to other people's requirements. You may want to edit some or all of the modules, or write some new ones, to get it to do exactly what you want. One of the reasons for using Python is that it makes such alterations so easy. Don't be afraid, just jump in and have a go.
 
@@ -63,6 +63,7 @@ Contents
    :maxdepth: 2
 
    Licence <essentials/LICENCE>
+   pywws Contributors <copyright>
    Dependencies <essentials/dependencies>
    Change log <essentials/CHANGELOG>
    User guides <guides/index>
@@ -89,7 +90,7 @@ Legalese
 
 | pywws - Python software for USB Wireless WeatherStations.
 | http://github.com/jim-easterbrook/pywws
-| Copyright (C) 2008-14 Jim Easterbrook jim@jim-easterbrook.me.uk
+| Copyright (C) 2008-15  :doc:`pywws contributors <copyright>`
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
