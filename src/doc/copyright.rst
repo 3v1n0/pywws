@@ -1,6 +1,6 @@
 .. pywws - Python software for USB Wireless Weather Stations
    http://github.com/jim-easterbrook/pywws
-   Copyright (C) 2008-15  pywws contributors
+   Copyright (C) 2015  pywws contributors
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -16,20 +16,11 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-User guides
-===========
+pywws Contributors
+==================
 
-Contents:
+The copywright to pywws and its documentation is jointly held by the following contributors.
 
-.. toctree::
-   :maxdepth: 3
-   
-   getstarted
-   hourlylogging
-   livelogging
-   integration
-   twitter
-   language
-   weather_ini
-   logfiles
-   humidex
+.. literalinclude:: ../contributors/contributors.txt
+
+.. include:: ../../CONTRIBUTING.rst

@@ -239,6 +239,11 @@ Sets the title of the graph. A single line of text, for example:
 ``<title>Today's weather</title>``. This title appears at the very top
 of the graph, outside any plot area.
 
+.. versionadded:: 15.06.0.dev1301
+   If the title contains any "%%" characters it will be used as a
+   strftime style format string for the datetime of the stop value. This
+   allows you to include the graph's date or time in the title.
+
 subplot
 ^^^^^^^
 
@@ -563,9 +568,14 @@ class BasePlotter(object):
             if not self.x_hi:
                 self.x_hi = datetime.utcnow()    # only if no hourly data
             self.x_hi += Local.utcoffset(self.x_hi)
-            # set end of graph to start of the next hour after last item
-            self.x_hi += timedelta(minutes=55)
-            self.x_hi = self.x_hi.replace(minute=0, second=0)
+            if self.duration < timedelta(hours=6):
+                # set end of graph to start of the next minute after last item
+                self.x_hi += timedelta(seconds=55)
+                self.x_hi = self.x_hi.replace(second=0)
+            else:
+                # set end of graph to start of the next hour after last item
+                self.x_hi += timedelta(minutes=55)
+                self.x_hi = self.x_hi.replace(minute=0, second=0)
             self.x_lo = self.x_hi - self.duration
         self.utcoffset = Local.utcoffset(self.x_hi)
         # open gnuplot command file
@@ -603,6 +613,10 @@ class BasePlotter(object):
         if title:
             if sys.version_info[0] < 3:
                 title = title.encode(self.encoding)
+            if '%' in title:
+                x_hi = (self.x_hi -
+                        self.utcoffset).replace(tzinfo=utc).astimezone(Local)
+                title = x_hi.strftime(title)
             title = 'title "%s"' % title
         of.write('set multiplot layout %d, %d %s\n' % (self.rows, self.cols, title))
         # do actual plots

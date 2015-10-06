@@ -36,13 +36,15 @@ Easy installation
 
 The easiest way to install pywws is with the pip command::
 
-   sudo pip install pywws --pre
+   sudo pip install pywws
 
 Upgrading pywws is also a one line command::
 
-   sudo pip install -U pywws --pre
+   sudo pip install -U pywws
 
 Now you are ready to :ref:`test-weather-station`.
+
+.. _getstarted-download:
 
 Download and extract
 ^^^^^^^^^^^^^^^^^^^^
@@ -84,14 +86,14 @@ To upgrade you use git to pull any changes::
    cd ~/weather/pywws
    git pull
 
-Install scripts
-^^^^^^^^^^^^^^^
+Install pywws
+^^^^^^^^^^^^^
 
-If you have not installed pywws with pip, you need to use setup.py to generate the "entry point" scripts for common pywws tasks::
+If you have downloaded or cloned the pywws source files, you need to use setup.py to install it::
 
    cd ~/weather/pywws
    python setup.py build
-   sudo python setup.py develop
+   sudo python setup.py install
 
 Note to Python 3 users: this will generate and use Python 3 versions of the pywws software in ``~/weather/pywws/build/lib``.
 
@@ -111,7 +113,7 @@ For example, to compile the French documentation::
    sphinx-intl build --locale-dir src/pywws/lang -l fr
    LANG=fr python setup.py build_sphinx
 
-The compiled documentation should then be found at ``~/weather/pywws/doc/fr/html/index.html``.
+The compiled documentation should then be found at ``~/weather/pywws/doc/html/index.html``.
 See :doc:`language` for more detail.
 
 .. _test-weather-station:
@@ -174,6 +176,10 @@ The recommended interval is 5 minutes, which still allows 2 weeks of storage.
 Use :py:mod:`pywws.SetWeatherStation` to set the interval::
 
    pywws-setweatherstation -r 5
+
+Note that the weather station will not start using the new interval until the current 30 minute logging period is finished.
+This may cause "station is not logging data" errors when running pywws logging.
+If this happens you need to wait until the 30 minute logging period ends.
 
 Log your weather station data
 -----------------------------

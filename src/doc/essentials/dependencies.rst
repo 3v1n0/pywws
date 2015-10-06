@@ -1,6 +1,6 @@
 .. pywws - Python software for USB Wireless Weather Stations
    http://github.com/jim-easterbrook/pywws
-   Copyright (C) 2008-15  Jim Easterbrook  jim@jim-easterbrook.me.uk
+   Copyright (C) 2008-15  pywws contributors
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -216,7 +216,7 @@ To create new language translations
 -----------------------------------
 
 pywws can be configured to use languages other than English, as described in :doc:`../guides/language`.
-The babel package is required to extract the strings to be translated and compile the translation files.
+The Babel package is required to extract the strings to be translated and to compile the translation files.
 
 *  `babel <http://babel.pocoo.org/>`_
 
@@ -224,21 +224,21 @@ The babel package is required to extract the strings to be translated and compil
 
   sudo pip install babel
 
-Translating the documentation also needs the sphinx-intl package.
-
-*  `sphinx-intl <https://pypi.python.org/pypi/sphinx-intl>`_
-
-::
-
-  sudo pip install sphinx-intl
-
-Copying files to or from Transifex is made easier with the transifex-client package.
+Copying files to or from Transifex requires the transifex-client package.
 
 *  `transifex-client <http://support.transifex.com/customer/portal/topics/440187-transifex-client>`_
 
 ::
 
   sudo pip install transifex-client
+
+Translating the documentation using local files needs the sphinx-intl package.
+
+*  `sphinx-intl <https://pypi.python.org/pypi/sphinx-intl>`_
+
+::
+
+  sudo pip install sphinx-intl
 
 .. versionchanged:: 14.05.dev1209
    pywws previously used the gettext package.
@@ -250,7 +250,7 @@ To 'compile' the documentation
 
 The documentation of pywws is written in "ReStructured text".
 A program called Sphinx is used to convert this easy to write format into HTML for use with a web browser.
-If you'd like to create a local copy of the documentation (so you don't have to rely on the online version, or to test a translation you're working on) you need to install Sphinx.
+If you'd like to create a local copy of the documentation (so you don't have to rely on the online version, or to test a translation you're working on) you need to install Sphinx, version 1.3 or later.
 
 *  `Sphinx <http://sphinx-doc.org/>`_
 

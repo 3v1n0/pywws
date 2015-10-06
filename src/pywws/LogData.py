@@ -110,6 +110,11 @@ class DataLogger(object):
 
     def check_fixed_block(self):
         fixed_block = self.ws.get_fixed_block(unbuffered=True)
+        # check 'magic number'
+        if (fixed_block['magic_0'], fixed_block['magic_1']) not in (
+                (0x55, 0xAA),):
+            self.logger.critical("Unrecognised 'magic number' %02x %02x",
+                                 fixed_block['magic_0'], fixed_block['magic_1'])
         # store info from fixed block
         self.status.unset('fixed', 'pressure offset')
         if not self.params.get('config', 'pressure offset'):
@@ -162,7 +167,8 @@ class DataLogger(object):
                     duplicates.append(last_date)
                     saved_date = self.raw_data.before(saved_date)
                     saved_ptr = self.ws.dec_ptr(saved_ptr)
-            if data['delay'] is None or data['delay'] > 30:
+            if (data['delay'] is None or
+                    data['delay'] > max(fixed_block['read_period'] * 2, 35)):
                 self.logger.error('invalid data at %04x, %s',
                                   last_ptr, last_date.isoformat(' '))
                 last_date -= timedelta(minutes=fixed_block['read_period'])

@@ -1,3 +1,3 @@
-__version__ = '15.05.0.cwop.dev1287'
-_release = '1287'
-_commit = '31bdc04'
+__version__ = '15.09.0.cwop.dev1312'
+_release = '1312'
+_commit = '3ece3b7'
