@@ -1,6 +1,6 @@
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-15  Jim Easterbrook  jim@jim-easterbrook.me.uk
+# Copyright (C) 2008-15  pywws contributors
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -411,6 +411,7 @@ class weather_station(object):
         # due. (During initialisation we get data every half second
         # anyway.)
         read_period = self.get_fixed_block(['read_period'])
+        self.logger.debug('read period %d', read_period)
         log_interval = float(read_period * 60)
         live_interval = 48.0
         old_ptr = self.current_pos()
@@ -418,9 +419,10 @@ class weather_station(object):
         now = time.time()
         next_live = self._sensor_clock.before(now + live_interval)
         if next_live:
-            last_log = (next_live - live_interval) - (old_data['delay'] * 60.0)
+            now = next_live - live_interval
         else:
-            last_log = now - ((old_data['delay'] + 1) * 60.0)
+            now -= live_interval
+        last_log = now - (old_data['delay'] * 60.0)
         next_log = self._station_clock.before(last_log + log_interval)
         ptr_time = 0
         data_time = 0
@@ -435,8 +437,8 @@ class weather_station(object):
                 pause = self.min_pause
             if next_log:
                 pause = min(pause, next_log - advance)
-            else:
-                pause = min(pause, last_log + log_interval - advance)
+            elif old_data['delay'] >= read_period - 1:
+                pause = self.min_pause
             pause = max(pause, self.min_pause)
             self.logger.debug(
                 'delay %s, pause %g', str(old_data['delay']), pause)
@@ -496,10 +498,17 @@ class weather_station(object):
                 if ptr_time - last_ptr_time < self.margin:
                     # pointer has just changed, so definitely at a logging time
                     self._station_clock.set_clock(ptr_time)
-                elif next_log and ptr_time < next_log - self.margin:
-                    self.logger.warning(
-                        'live_data lost log sync %g', ptr_time - next_log)
-                    self._station_clock.invalidate()
+                elif next_log:
+                    if ptr_time < next_log - self.margin:
+                        self.logger.warning(
+                            'live_data lost log sync %g', ptr_time - next_log)
+                        self._station_clock.invalidate()
+                else:
+                    self.logger.warning('missed ptr change time')
+                if read_period > new_data['delay']:
+                    read_period = new_data['delay']
+                    self.logger.warning('reset read period %d', read_period)
+                    log_interval = float(read_period * 60)
                 next_log = self._station_clock.nearest(ptr_time)
                 if next_log:
                     result = dict(new_data)
