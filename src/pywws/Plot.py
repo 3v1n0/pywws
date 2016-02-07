@@ -27,17 +27,38 @@
 Introduction
 ------------
 
-Like Template.py this is one of the more difficult to use modules in
-the weather station software collection. It plots a graph (or set of
-graphs) of weather data. Almost everything about the graph is
-controlled by an XML file. I refer to these files as templates, but
-they aren't templates in the same sense as Template.py uses to create
-text files.
+Like :py:mod:`pywws.Template` this is one of the more difficult to use
+modules in the weather station software collection. It plots a graph (or
+set of graphs) of weather data. Almost everything about the graph is
+controlled by an XML file. I refer to these files as templates, but they
+aren't templates in the same sense as :py:mod:`pywws.Template` uses to
+create text files.
 
 Before writing your own graph template files, it might be useful to
 look at some of the examples in the example_graph_templates directory.
 If (like I was) you are unfamiliar with XML, I suggest reading the W3
 Schools XML tutorial.
+
+Text encoding
+^^^^^^^^^^^^^
+
+The ``[config]`` section of :ref:`weather.ini <weather_ini-config>` has
+a ``gnuplot encoding`` entry that sets the text encoding pywws uses to
+write a gnuplot command file. The default value, ``iso_8859_1``, is
+suitable for most western European languages, but may need changing if
+you use another language. It can be set to any text encoding recognised
+by both the Python :py:mod:`codecs` module and the `gnuplot
+<http://www.gnuplot.info/documentation.html>`_ ``set encoding`` command.
+If Python and gnuplot have different names for the same encoding, give
+both names separated by a space, Python name first. For example::
+
+    [config]
+    gnuplot encoding = koi8_r koi8r
+
+Note that you need to choose an encoding for which ``gnuplot`` has a
+suitable font. You may need to set the font with a terminal_ element.
+Note also that this encoding is unrelated to the encoding of your XML
+graph file, which is set in the XML header.
 
 XML graph file syntax
 ^^^^^^^^^^^^^^^^^^^^^
@@ -55,53 +76,52 @@ temperature for the last 24 hours. ::
     </plot>
   </graph>
 
-In this example, the root element graph has one plot element, which
-has one subplot element. The subplot element contains a title element
-and a ycalc element. To plot more data on the same set of axes (for
-example dew point and temperature), we can add more subplot elements.
-To plot more than one set of axes (for example wind speed is measured
-in different units from temperature) in the same file we can add more
-plot elements.
+In this example, the root element graph has one plot element, which has
+one subplot element. The subplot element contains a title element and a
+ycalc element. To plot more data on the same graph (for example dew
+point and temperature), we can add more subplot elements. To plot more
+than one graph (for example wind speed is measured in different units
+from temperature) in the same file we can add more plot elements.
 
-The complete element hierarchy is shown below. ::
+The complete element hierarchy is shown below.
 
-    graph
-        plot
-            subplot
-                xcalc
-                ycalc
-                axes
-                style
-                colour
-                title
-            bmargin
-            yrange
-            y2range
-            ytics
-            y2tics
-            ylabel
-            ylabelangle
-            y2label
-            y2labelangle
-            grid
-            source
-            boxwidth
-            title
-            command
-        start
-        stop
-        duration
-        layout
-        size
-        fileformat
-        terminal
-        lmargin
-        rmargin
-        xformat
-        xlabel
-        dateformat
-        xtics
-        title
+|    graph_
+|        plot_
+|            subplot_
+|                xcalc_
+|                ycalc_
+|                axes_
+|                style_
+|                colour_
+|                :ref:`title <subplot-title>`
+|            bmargin_
+|            yrange_
+|            y2range_
+|            ytics_
+|            y2tics_
+|            ylabel_
+|            ylabelangle_
+|            y2label_
+|            y2labelangle_
+|            grid_
+|            source_
+|            boxwidth_
+|            :ref:`title <plot-title>`
+|            command_
+|        start_
+|        stop_
+|        duration_
+|        layout_
+|        size_
+|        fileformat_
+|        terminal_
+|        lmargin_
+|        rmargin_
+|        xformat_
+|        xlabel_
+|        dateformat_
+|        xtics_
+|        :ref:`title <graph-title>`
 
 graph
 ^^^^^
@@ -170,19 +190,31 @@ fileformat
 ^^^^^^^^^^
 
 Sets the image format of the file containing the graph. Default is
-png. Any string recognised by your installation of gnuplot should do.
-For example: ``<fileformat>gif</fileformat>`` will produce a GIF
+``png``. Any string recognised by your installation of gnuplot should
+do. For example: ``<fileformat>gif</fileformat>`` will produce a GIF
 image.
+
+If your installation of gnuplot supports it, ``pngcairo`` is an
+alternative to ``png`` that can yield much better looking results.
+
+.. versionadded:: 15.11.0.dev1331
+   You can also set terminal_ options in this string, for example:
+   ``<fileformat>pngcairo font "arial,8" rounded</fileformat>`` will use
+   a small "Arial" font and round the ends of line segments.
 
 terminal
 ^^^^^^^^
 
-Allows complete control of gnuplot's 'terminal' settings. You may want
+Allows complete control of gnuplot's "terminal" settings. You may want
 to use this if you are plotting to an unusual image format. Any string
 recognised by your installation of gnuplot's 'set terminal' command
-should do. For example: ``<terminal>svg enhanced font "arial,9" size
-600,800 dynamic rounded</terminal>``. This setting overwrites both
-size and fileformat.
+should do. For example: ``<terminal>svg enhanced font "arial,9" dynamic
+rounded size 600,800</terminal>``. This setting overwrites both size_
+and fileformat_.
+
+.. versionchanged:: 15.11.0.dev1331
+   The size_ and fileformat_ elements are now the preferred way to set
+   the gnuplot "terminal".
 
 lmargin
 ^^^^^^^
@@ -231,6 +263,8 @@ xtics
 Sets the spacing of the "tic" marks on the X axis. The value is an
 integer number of hours. The default is to allow gnuplot to set an
 appropriate interval.
+
+.. _graph-title:
 
 title
 ^^^^^
@@ -354,12 +388,14 @@ Sets the width of the "boxes" used when drawing bar graphs. The value
 is an integer expression yielding a number of seconds. Default depends
 on source: raw is 240, hourly is 2800 and daily is 2800 * 24.
 
+.. _plot-title:
+
 title
 ^^^^^
 
 Sets the title of the plot. A single line of text, for example:
 ``<title>Temperature (°C)</title>``. This title appears within the
-plot area, above any subplot titles.
+plot area, above any :ref:`subplot titles <subplot-title>`.
 
 command
 ^^^^^^^
@@ -371,6 +407,9 @@ beginning with the word set. For example: ``<command>set key tmargin
 center horizontal width 1 noreverse enhanced autotitles box linetype
 -1 linewidth 1</command>``. (Don't ask me what this example does — I'm
 not an advanced user).
+
+.. versionadded:: 15.11.0.dev1333
+   This element can be repeated to allow several things to be set.
 
 xcalc
 ^^^^^
@@ -422,9 +461,13 @@ gnuplot style can be set: ``<style>smooth unique lc 5 lw 3</style>``.
 colour
 ^^^^^^
 
-Sets the colour of the subplot line or boxes. Any integer value is
-accepted. The mapping of colours to numbers is set by gnuplot. Default
-value is the previous colour plus one.
+Sets the colour of the subplot line or boxes. This can be in any form
+that gnuplot accepts, typically a single integer or an rgb specification
+such as ``rgb "cyan"`` or ``rgb "FF00FF"``. The mapping of integer
+values to colours is set by gnuplot. Default value is an ever
+incrementing integer.
+
+.. _subplot-title:
 
 title
 ^^^^^
@@ -464,6 +507,9 @@ import subprocess
 import sys
 import xml.dom.minidom
 
+import pytz
+
+from .constants import HOUR
 from .conversions import *
 from . import DataStore
 from . import Localisation
@@ -489,6 +535,12 @@ class GraphNode(object):
                 else:
                     return ''
         return default
+
+    def get_values(self, name):
+        for child in self.node.childNodes:
+            if child.localName == name:
+                if child.childNodes:
+                    yield child.childNodes[0].data.strip()
 
 class GraphFileReader(GraphNode):
     def __init__(self, input_file):
@@ -516,16 +568,28 @@ class BasePlotter(object):
             params.get('config', 'gnuplot version', '4.2'))
         # set language related stuff
         self.encoding = params.get('config', 'gnuplot encoding', 'iso_8859_1')
-        # create work directory
+        if ' ' in self.encoding:
+            self.encoding = self.encoding.split()
+        else:
+            self.encoding = [self.encoding, self.encoding]
+        # check work directory exists
         if not os.path.isdir(self.work_dir):
-            os.makedirs(self.work_dir)
+            raise RuntimeError(
+                'Directory "' + self.work_dir + '" does not exist.')
+
+    def _local_offset(self, time):
+        try:
+            result = Local.utcoffset(time)
+        except pytz.AmbiguousTimeError:
+            result = Local.utcoffset(time + HOUR)
+        return result
 
     def _eval_time(self, time_str):
         # get timestamp of last data item
         result = self.hourly_data.before(datetime.max)
         if not result:
             result = datetime.utcnow()    # only if no hourly data
-        result += Local.utcoffset(result)
+        result += self._local_offset(result)
         # set to start of the day
         result = result.replace(hour=0, minute=0, second=0, microsecond=0)
         # apply time string
@@ -567,7 +631,7 @@ class BasePlotter(object):
             self.x_hi = self.hourly_data.before(datetime.max)
             if not self.x_hi:
                 self.x_hi = datetime.utcnow()    # only if no hourly data
-            self.x_hi += Local.utcoffset(self.x_hi)
+            self.x_hi += self._local_offset(self.x_hi)
             if self.duration < timedelta(hours=6):
                 # set end of graph to start of the next minute after last item
                 self.x_hi += timedelta(seconds=55)
@@ -577,16 +641,17 @@ class BasePlotter(object):
                 self.x_hi += timedelta(minutes=55)
                 self.x_hi = self.x_hi.replace(minute=0, second=0)
             self.x_lo = self.x_hi - self.duration
-        self.utcoffset = Local.utcoffset(self.x_hi)
+        self.utcoffset = self._local_offset(self.x_hi)
         # open gnuplot command file
         self.tmp_files = []
         cmd_file = os.path.join(self.work_dir, 'plot.cmd')
         self.tmp_files.append(cmd_file)
-        if sys.version_info[0] >= 3:
-            of = open(cmd_file, 'w', encoding=self.encoding)
-        else:
-            of = open(cmd_file, 'w')
+        of = codecs.open(cmd_file, 'w', encoding=self.encoding[0])
         # write gnuplot set up
+        of.write('set encoding %s\n' % (self.encoding[1]))
+        lcl = locale.getlocale()
+        if lcl[0]:
+            of.write('set locale "%s.%s"\n' % lcl)
         self.rows = self.GetDefaultRows()
         self.cols = (self.plot_count + self.rows - 1) // self.rows
         self.rows, self.cols = eval(self.graph.get_value(
@@ -597,26 +662,27 @@ class BasePlotter(object):
         w, h = eval(self.graph.get_value('size', '(%d, %d)' % (w, h)))
         fileformat = self.graph.get_value('fileformat', 'png')
         if fileformat == 'svg':
-            terminal = '%s enhanced font "arial,9" size %d,%d dynamic rounded' % (
-                fileformat, w, h)
+            terminal = 'svg enhanced font "arial,9" dynamic rounded'
+        elif u' ' not in fileformat:
+            terminal = '%s large' % (fileformat)
         else:
-            terminal = '%s large size %d,%d' % (fileformat, w, h)
+            terminal = fileformat
+        if u'size' not in terminal:
+            terminal += u' size %d,%d' % (w, h)
         terminal = self.graph.get_value('terminal', terminal)
-        of.write('set encoding %s\n' % (self.encoding))
-        lcl = locale.getlocale()
-        if lcl[0]:
-            of.write('set locale "%s.%s"\n' % lcl)
         of.write('set terminal %s\n' % (terminal))
         of.write('set output "%s"\n' % (output_file))
         # set overall title
         title = self.graph.get_value('title', '')
         if title:
-            if sys.version_info[0] < 3:
-                title = title.encode(self.encoding)
             if '%' in title:
                 x_hi = (self.x_hi -
                         self.utcoffset).replace(tzinfo=utc).astimezone(Local)
+                if sys.version_info[0] < 3:
+                    title = title.encode(self.encoding[0])
                 title = x_hi.strftime(title)
+                if sys.version_info[0] < 3:
+                    title = title.decode(self.encoding[0])
             title = 'title "%s"' % title
         of.write('set multiplot layout %d, %d %s\n' % (self.rows, self.cols, title))
         # do actual plots
@@ -625,14 +691,10 @@ class BasePlotter(object):
             plot = plot_list[plot_no]
             # set key / title location
             title = plot.get_value('title', '')
-            if sys.version_info[0] < 3:
-                title = title.encode(self.encoding)
             of.write('set key horizontal title "%s"\n' % title)
             # optional yaxis labels
             ylabel = plot.get_value('ylabel', '')
             if ylabel:
-                if sys.version_info[0] < 3:
-                    ylabel = ylabel.encode(self.encoding)
                 ylabelangle = plot.get_value('ylabelangle', '')
                 if ylabelangle:
                     ylabelangle = ' rotate by %s' % (ylabelangle)
@@ -641,8 +703,6 @@ class BasePlotter(object):
                 of.write('set ylabel\n')
             y2label = plot.get_value('y2label', '')
             if y2label:
-                if sys.version_info[0] < 3:
-                    y2label = y2label.encode(self.encoding)
                 y2labelangle = plot.get_value('y2labelangle', '')
                 if y2labelangle:
                     y2labelangle = ' rotate by %s' % (y2labelangle)
@@ -681,16 +741,16 @@ class GraphPlotter(BasePlotter):
         return 200 // self.cols, 600 // self.cols
 
     def GetPreamble(self):
-        result = """set style fill solid
+        result = u"""set style fill solid
 set xdata time
 set timefmt "%Y-%m-%dT%H:%M:%S"
 """
-        result += 'set xrange ["%s":"%s"]\n' % (
+        result += u'set xrange ["%s":"%s"]\n' % (
             self.x_lo.isoformat(), self.x_hi.isoformat())
         lmargin = eval(self.graph.get_value('lmargin', '5'))
-        result += 'set lmargin %g\n' % (lmargin)
+        result += u'set lmargin %g\n' % (lmargin)
         rmargin = eval(self.graph.get_value('rmargin', '-1'))
-        result += 'set rmargin %g\n' % (rmargin)
+        result += u'set rmargin %g\n' % (rmargin)
         if self.duration <= timedelta(hours=24):
             xformat = '%H%M'
         elif self.duration <= timedelta(days=7):
@@ -698,12 +758,10 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
         else:
             xformat = '%Y/%m/%d'
         xformat = self.graph.get_value('xformat', xformat)
-        result += 'set format x "%s"\n' % xformat
+        result += u'set format x "%s"\n' % xformat
         xtics = self.graph.get_value('xtics', None)
         if xtics:
-            result += 'set xtics %d\n' % (eval(xtics) * 3600)
-        if sys.version_info[0] < 3:
-            result = result.encode(self.encoding)
+            result += u'set xtics %d\n' % (eval(xtics) * 3600)
         return result
 
     def PlotData(self, plot_no, plot, source):
@@ -711,8 +769,8 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
         subplot_list = plot.get_children('subplot')
         subplot_count = len(subplot_list)
         if subplot_count < 1:
-            return ''
-        result = ''
+            return u''
+        result = u''
         pressure_offset = self.pressure_offset
         # label x axis of last plot
         if plot_no == self.plot_count - 1:
@@ -729,23 +787,29 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
                 xlabel = _('Date')
             xlabel = self.graph.get_value('xlabel', xlabel)
             if sys.version_info[0] < 3:
-                xlabel = xlabel.encode(self.encoding)
-            result += 'set xlabel "%s"\n' % (x_hi.strftime(xlabel))
+                xlabel = xlabel.encode(self.encoding[0])
+            xlabel = x_hi.strftime(xlabel)
+            if sys.version_info[0] < 3:
+                xlabel = xlabel.decode(self.encoding[0])
+            result += u'set xlabel "%s"\n' % xlabel
             dateformat = '%Y/%m/%d'
             dateformat = self.graph.get_value('dateformat', dateformat)
             if sys.version_info[0] < 3:
-                dateformat = dateformat.encode(self.encoding)
+                dateformat = dateformat.encode(self.encoding[0])
             ldat = x_lo.strftime(dateformat)
             rdat = x_hi.strftime(dateformat)
+            if sys.version_info[0] < 3:
+                ldat = ldat.decode(self.encoding[0])
+                rdat = rdat.decode(self.encoding[0])
             if ldat:
-                result += 'set label "%s" at "%s", graph -0.3 left\n' % (
+                result += u'set label "%s" at "%s", graph -0.3 left\n' % (
                     ldat, self.x_lo.isoformat())
             if rdat != ldat:
-                result += 'set label "%s" at "%s", graph -0.3 right\n' % (
+                result += u'set label "%s" at "%s", graph -0.3 right\n' % (
                     rdat, self.x_hi.isoformat())
         # set bottom margin
         bmargin = eval(plot.get_value('bmargin', '-1'))
-        result += 'set bmargin %g\n' % (bmargin)
+        result += u'set bmargin %g\n' % (bmargin)
         # set y ranges and tics
         yrange = plot.get_value('yrange', None)
         y2range = plot.get_value('y2range', None)
@@ -756,20 +820,20 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
         elif y2range and not y2tics:
             y2tics = 'autofreq'
         if yrange:
-            result += 'set yrange [%s]\n' % (yrange.replace(',', ':'))
+            result += u'set yrange [%s]\n' % (yrange.replace(',', ':'))
         else:
-            result += 'set yrange [*:*]\n'
+            result += u'set yrange [*:*]\n'
         if y2range:
-            result += 'set y2range [%s]\n' % (y2range.replace(',', ':'))
+            result += u'set y2range [%s]\n' % (y2range.replace(',', ':'))
         if y2tics:
-            result += 'set ytics nomirror %s; set y2tics %s\n' % (ytics, y2tics)
+            result += u'set ytics nomirror %s; set y2tics %s\n' % (ytics, y2tics)
         else:
-            result += 'unset y2tics; set ytics mirror %s\n' % (ytics)
+            result += u'unset y2tics; set ytics mirror %s\n' % (ytics)
         # set grid
-        result += 'unset grid\n'
+        result += u'unset grid\n'
         grid = plot.get_value('grid', None)
         if grid is not None:
-            result += 'set grid %s\n' % grid
+            result += u'set grid %s\n' % grid
         # x_lo & x_hi are in local time, data is indexed in UTC
         start = self.x_lo - self.utcoffset
         stop = self.x_hi - self.utcoffset
@@ -788,10 +852,9 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
             interval = timedelta(hours=36)
             boxwidth = 2800 * 24
         boxwidth = eval(plot.get_value('boxwidth', str(boxwidth)))
-        result += 'set boxwidth %d\n' % boxwidth
-        command = plot.get_value('command', None)
-        if command:
-            result += '%s\n' % command
+        result += u'set boxwidth %d\n' % boxwidth
+        for command in plot.get_values('command'):
+            result += u'%s\n' % command
         stop = source.after(stop)
         if stop:
             stop = stop + timedelta(minutes=1)
@@ -847,35 +910,34 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
             subplot.dat.write('%s ?\n' % (idx.isoformat()))
             subplot.dat.close()
         # plot data
-        result += 'plot '
-        colour = 0
+        result += u'plot '
+        colour_idx = 0
         for subplot_no in range(subplot_count):
             subplot = subplots[subplot_no]
-            colour = eval(subplot.subplot.get_value('colour', str(colour+1)))
+            colour_idx += 1
+            colour = subplot.subplot.get_value('colour', str(colour_idx))
             style = subplot.subplot.get_value(
-                'style', 'smooth unique lc %d lw 1' % (colour))
+                'style', 'smooth unique lc %s lw 1' % (colour))
             words = style.split()
             if len(words) > 1 and words[0] in ('+', 'x', 'line'):
-                width = int(words[1])
+                width = float(words[1])
             else:
                 width = 1
             if style == 'box':
-                style = 'lc %d lw 0 with boxes' % (colour)
+                style = 'lc %s lw 0 with boxes' % (colour)
             elif words[0] == '+':
-                style = 'lc %d lw %d pt 1 with points' % (colour, width)
+                style = 'lc %s lw %g pt 1 with points' % (colour, width)
             elif words[0] == 'x':
-                style = 'lc %d lw %d pt 2 with points' % (colour, width)
+                style = 'lc %s lw %g pt 2 with points' % (colour, width)
             elif words[0] == 'line':
-                style = 'smooth unique lc %d lw %d' % (colour, width)
+                style = 'smooth unique lc %s lw %g' % (colour, width)
             axes = subplot.subplot.get_value('axes', 'x1y1')
             title = subplot.subplot.get_value('title', '')
-            result += ' "%s" using 1:($2) axes %s title "%s" %s' % (
-                subplot.dat_file, axes, title, style)
+            result += u' "%s" using 1:2 axes %s %s title "%s"' % (
+                subplot.dat_file, axes, style, title)
             if subplot_no != subplot_count - 1:
-                result += ', \\'
-            result += '\n'
-        if sys.version_info[0] < 3:
-            result = result.encode(self.encoding)
+                result += u', \\'
+            result += u'\n'
         return result
 
 def main(argv=None):

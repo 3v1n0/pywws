@@ -44,6 +44,20 @@ actions is carried out.
 Before writing your own template files, it might be useful to look at
 some of the examples in the example_templates directory.
 
+Text encoding
+^^^^^^^^^^^^^
+
+The ``[config]`` section of :ref:`weather.ini <weather_ini-config>` has
+a ``template encoding`` entry that tells pywws what text encoding your
+template files use. The default value, ``iso-8859-1``, is suitable for
+most western European languages, but may need changing if you use
+another language. It can be set to any text encoding recognised by the
+Python :py:mod:`codecs` module.
+
+Make sure all your templates use the text encoding you set. The `iconv
+<http://man7.org/linux/man-pages/man1/iconv.1.html>`_ program can be
+used to transcode files.
+
 Processing instructions
 -----------------------
 
@@ -370,7 +384,7 @@ class Template(object):
         # do the text processing
         while True:
             line = tmplt.readline().decode(self.encoding)
-            if line == '':
+            if not line:
                 break
             parts = line.split('#')
             for i in range(len(parts)):
@@ -382,12 +396,15 @@ class Template(object):
                 if parts[i] and parts[i][0] == '!':
                     # comment
                     continue
+                # Python 2 shlex can't handle unicode
                 if sys.version_info[0] < 3:
                     parts[i] = parts[i].encode(self.encoding)
                 command = shlex.split(parts[i])
+                if sys.version_info[0] < 3:
+                    command = map(lambda x: x.decode(self.encoding), command)
                 if command == []:
                     # empty command == print a single '#'
-                    yield '#'
+                    yield u'#'
                 elif command[0] in (data.keys() + self.local_data.keys() + ['calc']):
                     # output a value
                     if not valid_data:
@@ -409,18 +426,23 @@ class Template(object):
                         x = x.replace(tzinfo=utc)
                         x = x.astimezone(time_zone)
                     # convert data
-                    if x != None and len(command) > 3:
+                    if x is not None and len(command) > 3:
                         x = eval(command[3])
                     # get format
-                    fmt = '%s'
+                    fmt = u'%s'
                     if len(command) > 1:
                         fmt = command[1]
                     # write output
-                    if x == None:
+                    if x is None:
                         if len(command) > 2:
                             yield command[2]
                     elif isinstance(x, datetime):
-                        yield x.strftime(fmt)
+                        if sys.version_info[0] < 3:
+                            fmt = fmt.encode(self.encoding)
+                        x = x.strftime(fmt)
+                        if sys.version_info[0] < 3:
+                            x = x.decode(self.encoding)
+                        yield x
                     elif not use_locale:
                         yield fmt % (x)
                     elif sys.version_info >= (2, 7) or '%%' not in fmt:
@@ -500,21 +522,14 @@ class Template(object):
         return
 
     def make_text(self, template_file, live_data=None):
-        result = ''
+        result = u''
         for text in self.process(live_data, template_file):
-            if sys.version_info[0] < 3 and isinstance(text, unicode):
-                text = text.encode(self.encoding)
             result += text
         return result
 
     def make_file(self, template_file, output_file, live_data=None):
-        if sys.version_info[0] >= 3:
-            of = open(output_file, 'w', encoding=self.encoding)
-        else:
-            of = open(output_file, 'w')
+        of = codecs.open(output_file, 'w', encoding=self.encoding)
         for text in self.process(live_data, template_file):
-            if sys.version_info[0] < 3 and isinstance(text, unicode):
-                text = text.encode(self.encoding)
             of.write(text)
         of.close()
         return 0

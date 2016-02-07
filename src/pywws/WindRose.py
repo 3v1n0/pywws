@@ -53,26 +53,26 @@ last 24 hours. ::
 In this example, the root element graph has one windrose element which
 contains nothing more than a ycalc element.
 
-The complete element hierarchy is shown below. ::
+The complete element hierarchy is shown below.
 
-    graph
-        windrose
-            xcalc
-            ycalc
-            threshold
-            colour
-            yrange
-            points
-            source
-            title
-        start
-        stop
-        duration
-        layout
-        size
-        fileformat
-        lmargin, rmargin, tmargin, bmargin
-        title
+|    graph_
+|        windrose_
+|            xcalc_
+|            ycalc_
+|            threshold_
+|            colour_
+|            yrange_
+|            points_
+|            source_
+|            :ref:`title <plot-title>`
+|        start_
+|        stop_
+|        duration_
+|        layout_
+|        size_
+|        fileformat_
+|        `lmargin, rmargin, tmargin, bmargin`_
+|        :ref:`title <graph-title>`
 
 graph
 ^^^^^
@@ -139,6 +139,8 @@ margin. Supply any positive real number, for example
 ``<lmargin>1.3</lmargin>``. Some experimentation may be necessary to
 find the best values.
 
+.. _graph-title:
+
 title
 ^^^^^
 
@@ -190,9 +192,12 @@ scale, if ycalc has been set to convert windspeeds to mph.
 colour
 ^^^^^^
 
-Sets the colours of the threshold petal segments. Any sequence of
-integer values is accepted. The mapping of colours to numbers is set
-by gnuplot. Default value is 0, 1, 2, 3, etc.
+Sets the colours of the threshold petal segments. Can be any sequence of
+values accepted by gnuplot. Default value is a sequence of integer
+colour indexes, which is probably not what you want. You may need to
+experiment with more complicated values such as ::
+
+  <colour>'rgb "grey"','rgb "#0000FF"','rgb "#00A080"','rgb "#00FF00"','rgb "#A0FF00"','rgb "#FFFF00"'</colour>
 
 yrange
 ^^^^^^
@@ -219,6 +224,8 @@ Select the weather data to be plotted. Permitted values are
 ``<source>daily</source>`` and ``<source>monthly</source>``. Default
 is raw. Note that the different sources have different data
 dictionaries, so this choice affects ycalc.
+
+.. _plot-title:
 
 title
 ^^^^^
@@ -270,7 +277,7 @@ class RosePlotter(BasePlotter):
         return 600 // self.rows, 600 // self.rows
 
     def GetPreamble(self):
-        result = """set polar
+        result = u"""set polar
 set angles degrees
 set zeroaxis
 set grid polar 22.5
@@ -279,18 +286,20 @@ unset border
 set xtics axis
 unset ytics
 """
+        if self.gnuplot_version >= 4.4:
+            result += u'set style fill solid noborder\n'
         if self.gnuplot_version >= 4.6:
-            result += """unset raxis
+            result += u"""unset raxis
 set rtics format ''
 """
         lmargin = eval(self.graph.get_value('lmargin', '-1'))
-        result += 'set lmargin %g\n' % (lmargin)
+        result += u'set lmargin %g\n' % (lmargin)
         lmargin = eval(self.graph.get_value('rmargin', '-1'))
-        result += 'set rmargin %g\n' % (lmargin)
+        result += u'set rmargin %g\n' % (lmargin)
         lmargin = eval(self.graph.get_value('tmargin', '-1'))
-        result += 'set tmargin %g\n' % (lmargin)
+        result += u'set tmargin %g\n' % (lmargin)
         lmargin = eval(self.graph.get_value('bmargin', '-1'))
-        result += 'set bmargin %g\n' % (lmargin)
+        result += u'set bmargin %g\n' % (lmargin)
         return result
 
     def PlotData(self, plot_no, plot, source):
@@ -334,20 +343,20 @@ set rtics format ''
         for n in range(16):
             total += histograms[0][n]
         for n in range(16):
-            histograms[0][n] = total // 16
+            histograms[0][n] = float(total) / 16.0
         # integrate histograms
         for i in range(1, len(thresh)):
             for n in range(16):
                 histograms[i][n] += histograms[i-1][n]
-        total = 0
+        total = 0.0
         for n in range(16):
             total += histograms[-1][n]
-        result = ''
+        result = u''
         yrange = plot.get_value('yrange', '31')
         if yrange == '*':
             # auto-ranging
             if total > 0:
-                max_petal = 100.0 * float(max(histograms[-1])) / float(total)
+                max_petal = 100.0 * float(max(histograms[-1])) / total
             else:
                 max_petal = 0.0
             if max_petal > 40.0:
@@ -360,43 +369,58 @@ set rtics format ''
                 yrange = 21
         else:
             yrange = eval(yrange)
-        result += 'set rrange [0:%d]\n' % (yrange)
-        result += 'set xrange [-%d:%d]\n' % (yrange, yrange)
-        result += 'set yrange [-%d:%d]\n' % (yrange, yrange)
+        result += u'set rrange [0:%f]\n' % (yrange)
+        result += u'set xrange [-%f:%f]\n' % (yrange, yrange)
+        result += u'set yrange [-%f:%f]\n' % (yrange, yrange)
         points = [_('N'), _('S'), _('E'), _('W')]
         points = eval(plot.get_value('points', str(points)))
-        result += 'set label 1000 "%s" at 0, %d center front\n' % (points[0], yrange)
-        result += 'set label 1001 "%s" at 0, -%d center front\n' % (points[1], yrange)
-        result += 'set label 1002 "%s" at %d, 0 center front\n' % (points[2], yrange)
-        result += 'set label 1003 "%s" at -%d, 0 center front\n' % (points[3], yrange)
+        result += u'set label 1000 "%s" at 0, %d center front\n' % (points[0], yrange)
+        result += u'set label 1001 "%s" at 0, -%d center front\n' % (points[1], yrange)
+        result += u'set label 1002 "%s" at %d, 0 center front\n' % (points[2], yrange)
+        result += u'set label 1003 "%s" at -%d, 0 center front\n' % (points[3], yrange)
         # plot segments for each speed-direction
-        result += 'plot '
+        result += u'plot '
         for i in reversed(range(len(thresh))):
             dat_file = os.path.join(self.work_dir, 'plot_%d_%d.dat' % (plot_no, i))
             self.tmp_files.append(dat_file)
             dat = open(dat_file, 'w')
             sub_total = 0
-            for n in range(16):
-                angle = 90.0 - (n * 22.5)
-                sub_total += histograms[i][n]
-                if i > 0:
-                    sub_total -= histograms[i-1][n]
+            if i == 0:
+                for n in range(16):
+                    sub_total += histograms[i][n]
                 if total > 0:
-                    value = 100.0 * float(histograms[i][n]) / float(total)
+                    value = 100.0 * float(histograms[i][0]) / float(total)
                 else:
                     value = 0.0
-                if i == 0:
-                    dat.write('%g %g\n' % (angle - 11.24, value * 0.994))
+                if self.gnuplot_version >= 4.4:
+                    dat.write('0 0 %g 0 360\n' % (value))
                 else:
-                    dat.write('%g %g\n' % (angle - 8.1, 0))
-                dat.write('%g %g\n' % (angle - 8.0, value * 0.997))
-                dat.write('%g %g\n' % (angle, value))
-                dat.write('%g %g\n' % (angle + 8.0, value * 0.997))
-                if i == 0:
-                    dat.write('%g %g\n' % (angle + 11.24, value * 0.994))
-                    dat.write('%g %g\n' % (angle + 11.25, 0))
-                else:
-                    dat.write('%g %g\n' % (angle + 8.1, 0))
+                    for n in range(16):
+                        angle = 90.0 - (n * 22.5)
+                        dat.write('%g %g\n' % (angle - 11.24, value * 0.994))
+                        dat.write('%g %g\n' % (angle - 8.0, value * 0.997))
+                        dat.write('%g %g\n' % (angle, value))
+                        dat.write('%g %g\n' % (angle + 8.0, value * 0.997))
+                        dat.write('%g %g\n' % (angle + 11.24, value * 0.994))
+                        dat.write('%g %g\n' % (angle + 11.25, 0))
+            else:
+                for n in range(16):
+                    angle = 90.0 - (n * 22.5)
+                    sub_total += histograms[i][n]
+                    sub_total -= histograms[i-1][n]
+                    if total > 0:
+                        value = 100.0 * float(histograms[i][n]) / float(total)
+                    else:
+                        value = 0.0
+                    if self.gnuplot_version >= 4.4:
+                        dat.write(
+                            '0 0 %g %g %g\n' % (value, angle - 10, angle + 10))
+                    else:
+                        dat.write('%g %g\n' % (angle - 8.1, 0))
+                        dat.write('%g %g\n' % (angle - 8.0, value * 0.997))
+                        dat.write('%g %g\n' % (angle, value))
+                        dat.write('%g %g\n' % (angle + 8.0, value * 0.997))
+                        dat.write('%g %g\n' % (angle + 8.1, 0))
             dat.close()
             # plot data
             if total > 0:
@@ -409,11 +433,15 @@ set rtics format ''
                 title = '> %g (%.3g%%)' % (thresh[i-1], value)
             else:
                 title = '%g .. %g (%.3g%%)' % (thresh[i-1], thresh[i], value)
-            result += '"%s" using 1:2 title "%s" with filledcurve lt %d' % (
-                dat_file, title, colour[i % len(colour)])
+            if self.gnuplot_version >= 4.4:
+                result += u'"%s" using 1:2:3:4:5 title "%s" with circles lc %s' % (
+                    dat_file, title, colour[i % len(colour)])
+            else:
+                result += u'"%s" using 1:2 title "%s" with filledcurve lt %s' % (
+                    dat_file, title, colour[i % len(colour)])
             if i > 0:
-                result += ', \\'
-            result += '\n'
+                result += u', \\'
+            result += u'\n'
         return result
 
 def main(argv=None):
