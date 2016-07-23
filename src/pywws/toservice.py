@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-15  pywws contributors
+# Copyright (C) 2008-16  pywws contributors
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -207,7 +207,10 @@ class ToService(object):
         self.old_response = None
         self.old_ex = None
         # set default socket timeout, so urlopen calls don't hang forever
-        socket.setdefaulttimeout(30)
+        if eval(self.params.get('config', 'asynchronous', 'False')):
+            socket.setdefaulttimeout(60)
+        else:
+            socket.setdefaulttimeout(20)
         # open params file
         service_params = SafeConfigParser()
         service_params.optionxform = str
@@ -337,7 +340,7 @@ class ToService(object):
             "port [%s] with a client_id [%s] and retain is %s",
             timestamp.isoformat(' '), topic, hostname, port, client_id, retain)
 
-        mosquitto_client.connect(hostname, port)
+        mosquitto_client.connect(hostname, int(port))
         mosquitto_client.publish(topic, json.dumps(prepared_data), retain=retain)
 
 ##        commented out as sending the data as a json object (above)
@@ -469,6 +472,7 @@ class ToService(object):
         self.logger.debug(coded_data)
         new_ex = self.old_ex
         ex_info = []
+        success = False
         try:
             if self.use_get:
                 request = urllib2.Request(self.server + '?' + coded_data)
@@ -486,19 +490,25 @@ class ToService(object):
                 self.old_response = response
             for line in response:
                 log('rsp: %s', line.strip())
-            if len(response) == len(self.expected_result):
-                for actual, expected in zip(response, self.expected_result):
-                    actual = actual.decode('utf-8')
+            for n, expected in enumerate(self.expected_result):
+                if n < len(response):
+                    actual = response[n].decode('utf-8')
                     if not re.match(expected, actual):
                         break
-                else:
-                    self.old_response = response
-                    if not ignore_last_update:
-                        self.set_last_update(timestamp)
-                    return True
+            else:
+                self.old_response = response
+                if not ignore_last_update:
+                    self.set_last_update(timestamp)
+                return True
             return False
         except urllib2.HTTPError, ex:
-            new_ex = '[%d]%s' % (ex.code, ex.reason)
+            if ex.code == 429 and self.service_name == 'metoffice':
+                # UK Met Office server uses 429 to signal duplicate data
+                success = True
+            if sys.version_info >= (2, 7):
+                new_ex = '[%d]%s' % (ex.code, ex.reason)
+            else:
+                new_ex = str(ex)
             ex_info = str(ex.info()).split('\n')
             try:
                 for line in ex.readlines():
@@ -520,7 +530,9 @@ class ToService(object):
             extra = extra.strip()
             if extra:
                 log('info: %s', extra)
-        return False
+        if success and not ignore_last_update:
+            self.set_last_update(timestamp)
+        return success
 
     def next_data(self, catchup, live_data, ignore_last_update=False):
         """Get weather data records to upload.

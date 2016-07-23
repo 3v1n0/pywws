@@ -2,7 +2,7 @@
 
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-15  pywws contributors
+# Copyright (C) 2008-16  pywws contributors
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -86,14 +86,14 @@ class TweepyHandler(object):
             self.api.update_status(status[:140], **self.kwargs)
 
 class PythonTwitterHandler(object):
-    def __init__(self, key, secret, latitude, longitude):
+    def __init__(self, key, secret, latitude, longitude, timeout):
         self.logger = logging.getLogger('pywws.ToTwitter')
         self.logger.info('Using python-twitter library')
         self.api = twitter.Api(
             consumer_key=pct.consumer_key,
             consumer_secret=pct.consumer_secret,
             access_token_key=key, access_token_secret=secret,
-            timeout=30)
+            timeout=timeout)
         if latitude is not None and longitude is not None:
             self.kwargs = {'latitude' : latitude, 'longitude' : longitude,
                            'display_coordinates' : True}
@@ -111,9 +111,8 @@ class PythonTwitterHandler(object):
 class ToTwitter(object):
     def __init__(self, params):
         self.logger = logging.getLogger('pywws.ToTwitter')
+        self.params = params
         self.old_ex = None
-        # get character encoding of template output
-        self.encoding = params.get('config', 'template encoding', 'iso-8859-1')
         # get parameters
         key = params.get('twitter', 'key')
         secret = params.get('twitter', 'secret')
@@ -131,7 +130,12 @@ class ToTwitter(object):
 
         # open API
         if twitter:
-            self.api = PythonTwitterHandler(key, secret, latitude, longitude)
+            if eval(params.get('config', 'asynchronous', 'False')):
+                timeout = 60
+            else:
+                timeout = 20
+            self.api = PythonTwitterHandler(
+                key, secret, latitude, longitude, timeout)
         else:
             self.api = TweepyHandler(key, secret, latitude, longitude)
 
@@ -156,7 +160,9 @@ class ToTwitter(object):
         return False
 
     def UploadFile(self, file):
-        tweet_file = codecs.open(file, 'r', encoding=self.encoding)
+        # get default character encoding of template output
+        encoding = self.params.get('config', 'template encoding', 'iso-8859-1')
+        tweet_file = codecs.open(file, 'r', encoding=encoding)
         tweet = tweet_file.read()
         tweet_file.close()
         return self.Upload(tweet)
