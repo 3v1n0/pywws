@@ -427,8 +427,7 @@ class ToService(object):
             except:
                 pass
 
-        finally:
-            try:
+            finally:
                 sock.close()
         except Exception, ex:
             new_ex = str(ex)
