@@ -444,6 +444,13 @@ computation is stored and made available to the next computation in
 the variable last_ycalc. This can be used with any data, but is most
 useful with rainfall: ``<ycalc>data['rain'] + last_ycalc</ycalc>``.
 
+A special case are plots with ``<style>candlesticks</style>`` or
+``<style>candlesticksw</style>`` which need 4 values in a specific
+order: ``<ycalc>(data['temp_out_min_ave'], data['temp_out_min_lo'],
+data['temp_out_max_hi'], data['temp_out_max_ave'])</ycalc>``. To add
+a median bar, use another candlesticks plot with
+``data['temp_out_ave']`` in all 4 fields.
+
 axes
 ^^^^
 
@@ -463,6 +470,12 @@ or ``<style>x</style>``. To select a line thickness 3 (for example)
 use: ``<style>line 3</style>``. The thickness of points can be set in
 a similar fashion. For complete control (for advanced users) a full
 gnuplot style can be set: ``<style>smooth unique lc 5 lw 3</style>``.
+
+For candlesticks plots you can specify line thickness as well, e.g.
+``<style>candlesticks 1.5</style>``. If you add whiskerbars, you can
+change the width of the whiskerbars with a second parameter, e.g.
+``<style>candlesticksw 2 0.5</style>`` would plot the whiskerbars with
+50%% width of the candlesticks.
 
 colour
 ^^^^^^
@@ -515,12 +528,12 @@ import xml.dom.minidom
 
 import pytz
 
-from .constants import HOUR
-from .conversions import *
-from . import DataStore
-from . import Localisation
-from .Logger import ApplicationLogger
-from .TimeZone import Local, utc
+from pywws.constants import HOUR
+from pywws.conversions import *
+from pywws import DataStore
+from pywws import Localisation
+from pywws.Logger import ApplicationLogger
+from pywws.TimeZone import Local, local_utc_offset, utc
 
 class GraphNode(object):
     def __init__(self, node):
@@ -583,19 +596,12 @@ class BasePlotter(object):
             raise RuntimeError(
                 'Directory "' + self.work_dir + '" does not exist.')
 
-    def _local_offset(self, time):
-        try:
-            result = Local.utcoffset(time)
-        except pytz.InvalidTimeError:
-            result = Local.utcoffset(time + HOUR)
-        return result
-
     def _eval_time(self, time_str):
         # get timestamp of last data item
         result = self.hourly_data.before(datetime.max)
         if not result:
             result = datetime.utcnow()    # only if no hourly data
-        result += self._local_offset(result)
+        result += local_utc_offset(result)
         # set to start of the day
         result = result.replace(hour=0, minute=0, second=0, microsecond=0)
         # apply time string
@@ -637,7 +643,7 @@ class BasePlotter(object):
             self.x_hi = self.hourly_data.before(datetime.max)
             if not self.x_hi:
                 self.x_hi = datetime.utcnow()    # only if no hourly data
-            self.x_hi += self._local_offset(self.x_hi)
+            self.x_hi += local_utc_offset(self.x_hi)
             if self.duration < timedelta(hours=6):
                 # set end of graph to start of the next minute after last item
                 self.x_hi += timedelta(seconds=55)
@@ -647,7 +653,7 @@ class BasePlotter(object):
                 self.x_hi += timedelta(minutes=55)
                 self.x_hi = self.x_hi.replace(minute=0, second=0)
             self.x_lo = self.x_hi - self.duration
-        self.utcoffset = self._local_offset(self.x_hi)
+        self.utcoffset = local_utc_offset(self.x_hi)
         # open gnuplot command file
         self.tmp_files = []
         cmd_file = os.path.join(self.work_dir, 'plot.cmd')
@@ -904,8 +910,12 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
                     else:
                         last_ycalc = subplot.last_ycalcs
                         value = eval(subplot.ycalc)
-                    subplot.dat.write('%s %g\n' % (idx.isoformat(), value))
-                    subplot.last_ycalcs = value
+                    if not isinstance(value, tuple):
+                        value = (value,)
+                    values = (idx.isoformat(),) + value
+                    vformat = '%s' + (' %g' * len(value)) + '\n'
+                    subplot.dat.write(vformat % values)
+                    subplot.last_ycalcs = value[0]
                 except TypeError:
                     if not subplot.cummulative:
                         subplot.dat.write('%s ?\n' % (idx.isoformat()))
@@ -925,12 +935,22 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
             style = subplot.subplot.get_value(
                 'style', 'smooth unique lc %s lw 1' % (colour))
             words = style.split()
-            if len(words) > 1 and words[0] in ('+', 'x', 'line'):
+            if len(words) > 1 and words[0] in ('+', 'x', 'line', 'candlesticks', 'candlesticksw'):
                 width = float(words[1])
             else:
                 width = 1
+            if len(words) > 2 and words[0] in ('candlesticksw'):
+                whiskerwidth = float(words[2])
+            else:
+                whiskerwidth = 1
+            whiskerbars = ''
             if style == 'box':
                 style = 'lc %s lw 0 with boxes' % (colour)
+            elif words[0] == 'candlesticks':
+                style = 'lc %s lw %g with candlesticks' % (colour, width)
+            elif words[0] == 'candlesticksw':
+                style = 'lc %s lw %g with candlesticks' % (colour, width)
+                whiskerbars = ' whiskerbars %g' % (whiskerwidth)
             elif words[0] == '+':
                 style = 'lc %s lw %g pt 1 with points' % (colour, width)
             elif words[0] == 'x':
@@ -939,8 +959,9 @@ set timefmt "%Y-%m-%dT%H:%M:%S"
                 style = 'smooth unique lc %s lw %g' % (colour, width)
             axes = subplot.subplot.get_value('axes', 'x1y1')
             title = subplot.subplot.get_value('title', '')
-            result += u' "%s" using 1:2 axes %s %s title "%s"' % (
-                subplot.dat_file, axes, style, title)
+            using = ':'.join('($%d)' % x for x in range(2, len(values)+1))
+            result += u' "%s" using 1:%s axes %s %s title "%s"%s' % (
+                subplot.dat_file, using, axes, style, title, whiskerbars)
             if subplot_no != subplot_count - 1:
                 result += u', \\'
             result += u'\n'

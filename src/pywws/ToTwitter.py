@@ -53,17 +53,17 @@ twitter = None
 tweepy = None
 try:
     import twitter
-except ImportError as ex:
+except ImportError, ex:
     try:
         import tweepy
     except ImportError:
         # raise exception on the preferred library
         raise ex
 
-from .constants import Twitter as pct
-from . import DataStore
-from . import Localisation
-from .Logger import ApplicationLogger
+from pywws.constants import Twitter as pct
+from pywws import DataStore
+from pywws import Localisation
+from pywws.Logger import ApplicationLogger
 
 class TweepyHandler(object):
     def __init__(self, key, secret, latitude, longitude):
@@ -101,12 +101,23 @@ class PythonTwitterHandler(object):
             self.kwargs = {}
 
     def post(self, status, media):
+        max_len = 140
+        if media:
+            max_len -= len(media[:4]) * 23
+        status = status.strip()[:max_len]
+        if tuple(map(int, twitter.__version__.split('.'))) >= (3, 0):
+            args = dict(self.kwargs)
+            if media:
+                args['media'] = media
+            args['verify_status_length'] = False
+            self.api.PostUpdate(status, **args)
+            return
         if len(media) > 1:
-            self.api.PostMultipleMedia(status[:117], media, **self.kwargs)
+            self.api.PostMultipleMedia(status, media[:4], **self.kwargs)
         elif media:
-            self.api.PostMedia(status[:117], media[0], **self.kwargs)
+            self.api.PostMedia(status, media[0], **self.kwargs)
         else:
-            self.api.PostUpdate(status[:140], **self.kwargs)
+            self.api.PostUpdate(status, **self.kwargs)
 
 class ToTwitter(object):
     def __init__(self, params):

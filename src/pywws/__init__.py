@@ -1,3 +1,3 @@
-__version__ = '16.07.2.cwop'
-_release = '1358'
-_commit = 'f1a2790'
+__version__ = '16.12.1.cwop'
+_release = '1368'
+_commit = '227d34d'

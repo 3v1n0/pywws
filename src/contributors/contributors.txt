@@ -10,12 +10,13 @@ Morten Høybye Frederiksen       morten@mfd-consult.dk
 Simon Josefsson                 simon@josefsson.org
 Matthew Hilton                  matthilton2005@gmail.com
 Sabine Tobolka			oe1yvw@gmail.com
+Markus Birth                    markus@birth-online.de
 
 Translators
 -----------
 
 Edoardo                         edoardo69@hotmail.it
-Jacques Desroches               jacques.desroches@meteostours.ca
+Jacques Desroches               metelsto@gmail.com
 Sunshades                       joacim@ahlstrand.info
 Johabu                          johabu96@yahoo.de
                                 karte2@gmail.com
