@@ -46,8 +46,8 @@ leading zeros are required. See question 3 in the `CWOP FAQ`_ for more
 information.
 
 Licensed radio hams use their callsign as the designator and need a
-passcode. Other users should leave the passcode at its default value of
-``-1``.
+passcode. Other users could not specify any value or should leave the
+passcode at its default value of ``-1``.
 
 The CWOP/APRS uploader is based on code by Marco Trevisan <mail@3v1n0.net>.
 
@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 class ToService(pywws.service.LiveDataService):
     config = {
         'designator': ('',   True, 'designator'),
-        'passcode'  : ('-1', True, 'passcode'),
+        'passcode'  : ('-1', False, 'passcode'),
         'latitude'  : ('',   True, 'latitude'),
         'longitude' : ('',   True, 'longitude'),
         'altitude'  : ('',   False, 'altitude'),
