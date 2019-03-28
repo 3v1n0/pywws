@@ -31,6 +31,7 @@ required by the API.
     [cwop]
     designator = EW9999
     latitude = 5130.06N
+    altitude = 155
     longitude = 00008.52E
     passcode = -1
 
@@ -78,6 +79,7 @@ class ToService(pywws.service.LiveDataService):
         'passcode'  : ('-1', True, 'passcode'),
         'latitude'  : ('',   True, 'latitude'),
         'longitude' : ('',   True, 'longitude'),
+        'altitude'  : ('',   False, 'altitude'),
         }
     fixed_data = {'version': pywws.__version__}
     interval = timedelta(seconds=290)
@@ -94,6 +96,14 @@ class ToService(pywws.service.LiveDataService):
 'rel_pressure' : #rel_pressure "'%05.0f'," "'.....'," "x * 10.0"#
 'rain_hour'    : #calc "100.0*rain_inch(rain_hour(data))" "'%03.0f'," "'...',"#
 'rain_24hr'    : #calc "100.0*rain_inch(rain_24hr(data))" "'%03.0f'," "'...',"#
+"""
+
+    def __init__(self, context, check_params=True):
+        super(ToService, self).__init__(context, check_params)
+        # extend template
+        if 'altitude' in self.params and len(self.params['altitude']):
+            self.template += """
+'altitude'     : #altitude     "'%06d'," "" "max_dec_length(altitude_feet(x), 6)"#
 """
 
     @contextmanager
@@ -116,9 +126,12 @@ class ToService(pywws.service.LiveDataService):
                   'z{latitude:s}/{longitude:s}' +
                   '_{wind_dir:s}/{wind_ave:s}g{wind_gust:s}t{temp_out:s}' +
                   'r{rain_hour:s}p{rain_24hr:s}b{rel_pressure:s}h{hum_out:s}' +
-                  '.pywws-{version:s}\n').format(**prepared_data)
+                  '.pywws-{version:s}').format(**prepared_data)
+        if 'altitude' in prepared_data:
+            packet += ' /A={altitude:s}'
+        packet = packet.format(**prepared_data)
         logger.debug('packet: "{:s}"'.format(packet))
-        packet = packet.encode('ASCII')
+        packet = packet.encode('ASCII') + '\n'
         try:
             session.sendall(login)
             response = session.recv(4096).decode('ASCII')
