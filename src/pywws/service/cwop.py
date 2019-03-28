@@ -77,8 +77,8 @@ class ToService(pywws.service.LiveDataService):
     config = {
         'designator': ('',   True, 'designator'),
         'passcode'  : ('-1', False, 'passcode'),
-        'latitude'  : ('',   True, 'latitude'),
-        'longitude' : ('',   True, 'longitude'),
+        'latitude'  : ('',   False, 'latitude'),
+        'longitude' : ('',   False, 'longitude'),
         'altitude'  : ('',   False, 'altitude'),
         }
     fixed_data = {'version': pywws.__version__}
@@ -88,6 +88,8 @@ class ToService(pywws.service.LiveDataService):
     template = """
 #live#
 'idx'          : #idx          "'%d%H%M',"#
+'lat_loran'    : #calc "latitude_loran(local_data['latitude'])" "'%s'," "'c',"#
+'lon_loran'    : #calc "latitude_loran(local_data['longitude'])" "'%s'," "'c',"#
 'wind_dir'     : #wind_dir     "'%03.0f'," "'...',"   "winddir_degrees(x)"#
 'wind_ave'     : #wind_ave     "'%03.0f'," "'...',"   "wind_mph(x)"#
 'wind_gust'    : #wind_gust    "'%03.0f'," "'...',"   "wind_mph(x)"#
@@ -128,7 +130,7 @@ class ToService(pywws.service.LiveDataService):
         logger.debug('login: "{:s}"'.format(login))
         login = login.encode('ASCII')
         packet = ('{designator:s}>APRS,TCPIP*:@{idx:s}' +
-                  'z{latitude:s}/{longitude:s}' +
+                  'z{lat_loran:s}/{lon_loran:s}' +
                   '_{wind_dir:s}/{wind_ave:s}g{wind_gust:s}t{temp_out:s}')
         if self.context.params.get('config', 'ws type') == '3080' and \
            not int(prepared_data['rain_hour']):
