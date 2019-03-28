@@ -101,6 +101,11 @@ class ToService(pywws.service.LiveDataService):
     def __init__(self, context, check_params=True):
         super(ToService, self).__init__(context, check_params)
         # extend template
+        if context.params.get('config', 'ws type') == '3080':
+            self.template += """
+'illuminance_t': #calc "'L' if illuminance_wm2(data['illuminance']) < 1000 else 'l'" "'%s'," "'l',"#
+'illuminance'  : #calc "illuminance_wm2(data['illuminance'])" "'%03d'," "'...'," "max_dec_length(x if x < 1000 else (x-1000), 3),"#
+"""
         if 'altitude' in self.params and len(self.params['altitude']):
             self.template += """
 'altitude'     : #altitude     "'%06d'," "" "max_dec_length(altitude_feet(x), 6)"#
@@ -124,9 +129,14 @@ class ToService(pywws.service.LiveDataService):
         login = login.encode('ASCII')
         packet = ('{designator:s}>APRS,TCPIP*:@{idx:s}' +
                   'z{latitude:s}/{longitude:s}' +
-                  '_{wind_dir:s}/{wind_ave:s}g{wind_gust:s}t{temp_out:s}' +
-                  'r{rain_hour:s}p{rain_24hr:s}b{rel_pressure:s}h{hum_out:s}' +
-                  '.pywws-{version:s}').format(**prepared_data)
+                  '_{wind_dir:s}/{wind_ave:s}g{wind_gust:s}t{temp_out:s}')
+        if self.context.params.get('config', 'ws type') == '3080' and \
+           not int(prepared_data['rain_hour']):
+               packet += '{illuminance_t:s}{illuminance:s}'
+        else:
+            packet += 'r{rain_hour:s}'
+        packet += ('p{rain_24hr:s}b{rel_pressure:s}h{hum_out:s}' +
+                   '.pywws-{version:s}')
         if 'altitude' in prepared_data:
             packet += ' /A={altitude:s}'
         packet = packet.format(**prepared_data)
