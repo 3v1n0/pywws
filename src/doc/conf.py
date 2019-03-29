@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
-#
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-16  pywws contributors
+# Copyright (C) 2008-18  pywws contributors
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -35,20 +33,18 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+##sys.path.insert(0, os.path.abspath('..'))
 
-sys.path.insert(0, os.path.abspath('..'))
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
-# cludge to allow documentation to be compiled without installing dependencies
-class Dummy(object):
-    def __getattr__(self, name):
-        if name in ('__file__',):
-            return None
-        return Dummy
+# allow documentation to be compiled without installing dependencies
+import mock
 
-for mod_name in ('hid', 'oauth2', 'twitter', 'usb', 'usb.core', 'usb.util',
-                 'libusb1', 'usb1', 'daemon', 'daemon.runner'):
-    sys.modules[mod_name] = Dummy()
+for mod_name in ('hid', 'oauth2', 'mastodon', 'twitter',
+                 'paho', 'paho.mqtt.client', 'paramiko',
+                 'usb', 'usb.core', 'usb.util', 'libusb1', 'usb1',
+                 'daemon.daemon', 'daemon.runner'):
+    sys.modules[mod_name] = mock.Mock()
 
 # -- General configuration -----------------------------------------------------
 
@@ -58,12 +54,13 @@ for mod_name in ('hid', 'oauth2', 'twitter', 'usb', 'usb.core', 'usb.util',
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosummary',
-              'sphinx.ext.viewcode', 'sphinx.ext.intersphinx']
+              'sphinx.ext.viewcode', 'sphinx.ext.intersphinx',
+              'sphinx.ext.inheritance_diagram']
 
 autosummary_generate = True
 autoclass_content = 'both'
 autodoc_member_order = 'bysource'
-autodoc_default_flags = ['members', 'undoc-members']
+autodoc_default_flags = ['members', 'undoc-members', 'show-inheritance']
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/2', None),
@@ -71,6 +68,8 @@ intersphinx_mapping = {
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+highlight_language = 'none'
 
 rst_epilog = """
 ----
@@ -90,7 +89,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pywws'
-copyright = u'2008-16, pywws contributors'
+copyright = u'2008-18, pywws contributors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

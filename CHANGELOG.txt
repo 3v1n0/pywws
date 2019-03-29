@@ -1,6 +1,6 @@
 pywws - Python software for USB Wireless Weather Stations
 http://github.com/jim-easterbrook/pywws
-Copyright (C) 2008-16  pywws contributors
+Copyright (C) 2008-18  pywws contributors
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,6 +15,58 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+Changes in v18.10.1:
+    1/ Fix bug when running a service directly (in Python 2 only) introduced
+       in v18.9.0.
+
+Changes in v18.10.0:
+    1/ Fix template loop bug (in Python 2 only) introduced in v18.9.0.
+
+Changes in v18.9.0:
+    1/ Major changes to ftp uploads. New ftp/sftp/copy services do the
+       uploading. pywws should make the required changes to weather.ini
+       automatically, but users should check after running v18.9.0 for the
+       first time.
+    2/ New services to post to Mastodon and WeatherCloud.
+    3/ MQTT service can now use TLS.
+    4/ Various bug fixes and minor improvements.
+
+Changes in v18.6.3:
+    1/ Restore Python source text encoding comments needed by some Python 2
+       versions.
+    2/ Add example AWS uploader module from Chris Ramsay.
+
+Changes in v18.6.2:
+    1/ Fix duplicate data bug in live logging.
+
+Changes in v18.6.1:
+    1/ Fix bug in "fixed block" date parsing.
+
+Changes in v18.6.0:
+    1/ Substantial rewrite of much of pywws. It is now more "standard" in many
+       ways, such as names of modules, and is compatible with Python 2.7 and 3.
+    2/ New "service" uploaders. "underground_rf" and "cwop_ham" have been
+       merged in to "underground" and "cwop".
+    3/ "Day end hour" can now vary with daylight savings time.
+    4/ Improved reliability with "3080" class stations.
+    5/ Various other bug fixes and minor improvements.
+
+Changes in v18.04.1:
+    1/ Fix bug in utc <-> local time conversions.
+
+Changes in v18.04.0:
+    1/ Now works with broken weather stations that have stopped logging data.
+       (Although there may be more gaps in the data.)
+    2/ Cope better with missing wind direction data.
+    3/ Use HTTPS for Weather Underground uploads.
+    4/ Other minor bug fixes.
+
+Changes in v17.11.0:
+    1/ Allow MQTT service without password.
+    2/ Allow SFTP uploads with public key.
+    3/ Increase Twitter character limit from 140 to 280.
+    4/ Various other bug fixes and minor improvements.
 
 Changes in v16.12.0:
     1/ Added "candlestick" plot type.

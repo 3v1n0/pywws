@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 # pywws - Python software for USB Wireless Weather Stations
 # http://github.com/jim-easterbrook/pywws
-# Copyright (C) 2008-16  pywws contributors
+# Copyright (C) 2008-18  pywws contributors
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -34,7 +32,7 @@ else:
     execfile('src/pywws/__init__.py')
 
 # get GitHub repo information
-# requires GitPython - 'sudo pip install gitpython --pre'
+# requires GitPython - 'sudo pip install gitpython'
 try:
     import git
 except ImportError:
@@ -55,23 +53,22 @@ if git:
                 _release = str(int(_release) + 1)
                 _commit = last_commit
             if last_release:
-                major, minor, patch = last_release.split('.')
+                major, minor, patch = map(int, last_release.split('.'))
                 today = date.today()
-                if today.strftime('%y%m') == major + minor:
-                    patch = int(patch) + 1
+                year = today.year % 100
+                if year == major and today.month == minor:
+                    patch += 1
                 else:
                     patch = 0
-                __version__ = today.strftime('%y.%m') + '.%d' % patch
-            vf = open('src/pywws/__init__.py', 'r')
-            old_init_str = vf.read()
-            vf.close()
+                __version__ = '{:d}.{:d}.{:d}'.format(year, today.month, patch)
+            with open('src/pywws/__init__.py', 'r') as vf:
+                old_init_str = vf.read()
             new_init_str = "__version__ = '" + __version__ + "'\n"
             new_init_str += "_release = '" + _release + "'\n"
             new_init_str += "_commit = '" + _commit + "'\n"
             if new_init_str != old_init_str:
-                vf = open('src/pywws/__init__.py', 'w')
-                vf.write(new_init_str)
-                vf.close()
+                with open('src/pywws/__init__.py', 'w') as vf:
+                    vf.write(new_init_str)
     except (git.exc.InvalidGitRepositoryError, git.exc.GitCommandNotFound):
         pass
 
@@ -141,9 +138,10 @@ command_options['upload_docs'] = {
     }
 
 # modify upload class to add appropriate tag
-# requires GitPython - 'sudo pip install gitpython --pre'
+# requires GitPython - 'sudo pip install gitpython'
 class upload_and_tag(upload):
     def run(self):
+        result = upload.run(self)
         import git
         message = __version__ + '\n\n'
         with open('CHANGELOG.txt') as cl:
@@ -158,12 +156,12 @@ class upload_and_tag(upload):
         tag = repo.create_tag(__version__, message=message)
         remote = repo.remotes.origin
         remote.push(tags=True)
-        return upload.run(self)
+        return result
 cmdclass['upload'] = upload_and_tag
 
 # set options for building distributions
 command_options['sdist'] = {
-    'formats'        : ('setup.py', 'gztar zip'),
+    'formats'        : ('setup.py', 'gztar'),
     }
 
 with open('README.rst') as ldf:
@@ -175,7 +173,7 @@ setup(name = 'pywws',
       author = 'Jim Easterbrook',
       author_email = 'jim@jim-easterbrook.me.uk',
       url = 'http://jim-easterbrook.github.com/pywws/',
-      download_url = 'https://pypi.python.org/pypi/pywws/%s' % __version__,
+      download_url = 'https://pypi.python.org/pypi/pywws/' + __version__,
       long_description = long_description,
       classifiers = [
           'Development Status :: 5 - Production/Stable',
@@ -183,12 +181,12 @@ setup(name = 'pywws',
           'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
           'Operating System :: OS Independent',
           'Programming Language :: Python',
-          'Programming Language :: Python :: 2',
+          'Programming Language :: Python :: 2.7',
           'Programming Language :: Python :: 3',
           ],
       license = 'GNU GPL',
       platforms = ['POSIX', 'MacOS', 'Windows'],
-      packages = ['pywws'],
+      packages = ['pywws', 'pywws.service'],
       package_dir = {'' : 'src'},
       package_data = {
           'pywws' : [
@@ -201,21 +199,20 @@ setup(name = 'pywws',
       command_options = command_options,
       entry_points = {
           'console_scripts' : [
-              'pywws-hourly             = pywws.Hourly:main',
-              'pywws-livelog            = pywws.LiveLog:main',
+              'pywws-hourly             = pywws.hourly:main',
+              'pywws-livelog            = pywws.livelog:main',
               'pywws-livelog-daemon     = pywws.livelogdaemon:main',
-              'pywws-reprocess          = pywws.Reprocess:main',
-              'pywws-setweatherstation  = pywws.SetWeatherStation:main',
-              'pywws-testweatherstation = pywws.TestWeatherStation:main',
+              'pywws-reprocess          = pywws.reprocess:main',
+              'pywws-setweatherstation  = pywws.setweatherstation:main',
+              'pywws-testweatherstation = pywws.testweatherstation:main',
               'pywws-version            = pywws.version:main',
               ],
           },
       install_requires = ['tzlocal'],
       extras_require = {
-          'daemon'  : ['python-daemon'],
+          'daemon'  : ['python-daemon == 2.1.2'],
           'sftp'    : ['paramiko', 'pycrypto'],
-          'twitter' : ['python-twitter >= 2.1', 'oauth2'],
+          'twitter' : ['python-twitter >= 3.0', 'oauth2'],
           },
       zip_safe = False,
-      use_2to3 = True,
       )

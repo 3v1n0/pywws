@@ -1,3 +1,4 @@
+.gitignore
 *.py[co]
 
 # Packages
@@ -22,9 +23,4 @@ src/doc/api/pywws.*.rst
 
 # Compiled language files
 *.mo
-
-# Miscellaneous
-MANIFEST
-pywws/lang
-translations/*.pot
-translations/*/LC_MESSAGES
+*.stackdump
