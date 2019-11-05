@@ -74,7 +74,7 @@ class ToService(pywws.service.CatchupDataService):
         'password': ('',      True, 'PASSWORD'),
         'internal': ('False', True, None),
         }
-    fixed_data = {'action': 'updateraw', 'softwaretype': 'pywws'}
+    fixed_data = {'action': 'updateraw', 'softwaretype': 'pywws-Openmoko-deb'}
     interval = timedelta(seconds=47)
     logger = logger
     service_name = service_name
