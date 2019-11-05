@@ -89,15 +89,16 @@ class ToService(pywws.service.LiveDataService):
 #live#
 'idx'          : #idx          "'%d%H%M',"#
 'lat_loran'    : #calc "latitude_loran(local_data['latitude'])" "'%s'," "'c',"#
-'lon_loran'    : #calc "latitude_loran(local_data['longitude'])" "'%s'," "'c',"#
-'wind_dir'     : #wind_dir     "'%03.0f'," "'...',"   "winddir_degrees(x)"#
-'wind_ave'     : #wind_ave     "'%03.0f'," "'...',"   "wind_mph(x)"#
-'wind_gust'    : #wind_gust    "'%03.0f'," "'...',"   "wind_mph(x)"#
-'temp_out'     : #temp_out     "'%03.0f'," "'...',"   "temp_f(x)"#
+'lon_loran'    : #calc "longitude_loran(local_data['longitude'])" "'%s'," "'c',"#
+'wind_dir'     : #wind_dir     "'%03d'," "'...',"   "max_dec_length(winddir_degrees(x), 3)"#
+'wind_ave'     : #wind_ave     "'%03d'," "'...',"   "max_dec_length(wind_mph(x), 3)"#
+'wind_gust'    : #wind_gust    "'%03d'," "'...',"   "max_dec_length(wind_mph(x), 3)"#
+'temp_out'     : #calc "temp_f(data['temp_out'])" "'%03d'," "'...',"   "max_dec_length(x, 3) if x > 0 else max_dec_length(x, 2)"#
 'hum_out'      : #hum_out      "'%02d',"   "'..',"    "x % 100"#
-'rel_pressure' : #rel_pressure "'%05.0f'," "'.....'," "x * 10.0"#
-'rain_hour'    : #calc "100.0*rain_inch(rain_hour(data))" "'%03.0f'," "'...',"#
-'rain_24hr'    : #calc "100.0*rain_inch(rain_24hr(data))" "'%03.0f'," "'...',"#
+'rel_pressure' : #rel_pressure "'%05d'," "'.....'," "max_dec_length(x * 10.0, 5)"#
+'rain_hour'    : #calc "100.0*rain_inch(rain_hour(data))" "'%03d'," "'...'," "max_dec_length(x, 3),"#
+'rain_24hr'    : #calc "100.0*rain_inch(rain_24hr(data))" "'%03d'," "'...'," "max_dec_length(x, 3),"#
+'rain_day'     : #calc "100.0*rain_inch(rain_day(data))" "'%03d'," "'...'," "max_dec_length(x, 3),"#
 """
 
     def __init__(self, context, check_params=True):
@@ -137,7 +138,7 @@ class ToService(pywws.service.LiveDataService):
                packet += '{illuminance_t:s}{illuminance:s}'
         else:
             packet += 'r{rain_hour:s}'
-        packet += ('p{rain_24hr:s}b{rel_pressure:s}h{hum_out:s}' +
+        packet += ('p{rain_24hr:s}P{rain_day:s}h{hum_out:s}b{rel_pressure:s}' +
                    '.pywws-{version:s}')
         if 'altitude' in prepared_data:
             packet += ' /A={altitude:s}'
