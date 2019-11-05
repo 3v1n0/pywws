@@ -16,6 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+Changes in v19.7.1:
+    1/ Fix file data iteration bug introduced in v19.7.0.
+
+Changes in v19.7.0:
+    1/ Update default template_txt for service.mqtt to provide wider range of
+       values out of the box. The published format is not backwards compatible,
+       but this only affects new users.
+    2/ Improved reliability with "solar" stations when lost contact with solar
+       sensors.
+    3/ Some file data errors should now be detected and a log message sent.
+
 Changes in v19.4.0:
     1/ Can optionally use SQLite3 data store instead of CSV files.
     2/ Improve weathercloud service uploader.

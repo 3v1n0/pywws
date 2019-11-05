@@ -81,10 +81,14 @@ class ToService(pywws.service.LiveDataService):
     "'hum'      : '%.d',"#
 #wind_ave
     "'wspdavg'  : '%.0f'," "" "scale(x, 10.0)"#
+#wind_ave
+    "'wspd'     : '%.0f'," "" "scale(x, 10.0)"#
 #wind_gust
     "'wspdhi'   : '%.0f'," "" "scale(x, 10.0)"#
 #wind_dir
     "'wdiravg'  : '%.0f'," "" "winddir_degrees(x)"#
+#wind_dir
+    "'wdir'     : '%.0f'," "" "winddir_degrees(x)"#
 #rel_pressure
     "'bar'      : '%.0f'," "" "scale(x, 10.0)"#
 #calc "rain_day(data)"
@@ -133,8 +137,8 @@ class ToService(pywws.service.LiveDataService):
             rsp = session.get(url, params=prepared_data, timeout=60)
         except Exception as ex:
             return False, repr(ex)
-        text = int(rsp.text)
-        if text == 200:
+        text = rsp.text.strip()
+        if text == '200':
             return True, 'OK'
         if text in responses:
             return False, '{} ({})'.format(responses[text], text)
